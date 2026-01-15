@@ -1,6 +1,6 @@
 {
   "name": "ignition-toolbox",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Ignition Automation Toolkit - Visual acceptance testing platform for Ignition SCADA",
   "main": "dist-electron/main.js",
   "author": "Nigel G",
@@ -14,8 +14,10 @@
     "build": "npm run build:frontend && npm run build:electron",
     "build:frontend": "cd frontend && npm run build",
     "build:electron": "tsc -p electron/tsconfig.json",
-    "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win --x64",
+    "build:backend": "cd backend && pyinstaller backend.spec --clean --noconfirm",
+    "build:backend:win": "cd backend && .venv\\Scripts\\pyinstaller.exe backend.spec --clean --noconfirm",
+    "dist": "npm run build && npm run build:backend && electron-builder",
+    "dist:win": "npm run build && npm run build:backend:win && electron-builder --win --x64",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
@@ -41,19 +43,14 @@
     },
     "files": [
       "dist-electron/**/*",
-      "frontend/dist/**/*",
-      "backend/**/*",
-      "!backend/**/__pycache__/**",
-      "!backend/**/*.pyc"
+      "frontend/dist/**/*"
     ],
     "extraResources": [
       {
-        "from": "backend",
+        "from": "backend/dist/backend",
         "to": "backend",
         "filter": [
-          "**/*",
-          "!**/__pycache__/**",
-          "!**/*.pyc"
+          "**/*"
         ]
       }
     ],

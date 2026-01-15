@@ -41,8 +41,12 @@ def main():
     os.environ["ALLOWED_ORIGINS"] = allowed_origins
 
     try:
+        # Import app directly for PyInstaller compatibility
+        # (string imports don't work well with frozen executables)
+        from ignition_toolkit.api.app import app
+
         uvicorn.run(
-            "ignition_toolkit.api.app:app",
+            app,
             host=host,
             port=port,
             log_level="info",
