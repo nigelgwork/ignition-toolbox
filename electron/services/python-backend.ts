@@ -124,12 +124,44 @@ export class PythonBackend {
     let args: string[];
     let cwd: string;
 
+    // Log environment info for debugging
+    console.log(`[Backend] App packaged: ${app.isPackaged}`);
+    console.log(`[Backend] Resources path: ${process.resourcesPath}`);
+    console.log(`[Backend] Use frozen: ${useFrozen}`);
+
     if (useFrozen) {
       // Production: use frozen executable
       executable = this.getFrozenExecutablePath();
       args = [];
       cwd = path.dirname(executable);
-      console.log(`Starting frozen backend: ${executable}`);
+      console.log(`[Backend] Starting frozen backend: ${executable}`);
+
+      // Verify executable exists
+      if (!fs.existsSync(executable)) {
+        console.error(`[Backend] ERROR: Executable not found at: ${executable}`);
+        // List what's actually in the resources directory
+        const resourcesBackend = path.join(process.resourcesPath, 'backend');
+        if (fs.existsSync(resourcesBackend)) {
+          console.log(`[Backend] Contents of ${resourcesBackend}:`);
+          try {
+            const files = fs.readdirSync(resourcesBackend);
+            files.forEach(f => console.log(`  - ${f}`));
+          } catch (e) {
+            console.error(`[Backend] Could not list directory: ${e}`);
+          }
+        } else {
+          console.error(`[Backend] Backend directory does not exist: ${resourcesBackend}`);
+          // List resources directory
+          console.log(`[Backend] Contents of ${process.resourcesPath}:`);
+          try {
+            const files = fs.readdirSync(process.resourcesPath);
+            files.forEach(f => console.log(`  - ${f}`));
+          } catch (e) {
+            console.error(`[Backend] Could not list resources: ${e}`);
+          }
+        }
+        throw new Error(`Backend executable not found at: ${executable}`);
+      }
     } else {
       // Development: use Python script
       executable = this.findPythonExecutable();
@@ -137,11 +169,11 @@ export class PythonBackend {
       const scriptPath = path.join(backendPath, 'run_backend.py');
       args = [scriptPath];
       cwd = backendPath;
-      console.log(`Starting Python backend: ${executable} ${scriptPath}`);
+      console.log(`[Backend] Starting Python backend: ${executable} ${scriptPath}`);
     }
 
-    console.log(`Working directory: ${cwd}`);
-    console.log(`Port: ${this.port}`);
+    console.log(`[Backend] Working directory: ${cwd}`);
+    console.log(`[Backend] Port: ${this.port}`);
 
     // Set environment variables
     const env = {
