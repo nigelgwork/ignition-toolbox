@@ -34,10 +34,40 @@ export class PythonBackend {
   }
 
   /**
-   * Find the Python executable
+   * Check if we should use the frozen executable (production) or Python script (development)
+   */
+  private useFrozenExecutable(): boolean {
+    if (app.isPackaged) {
+      // Production: always use frozen executable
+      return true;
+    }
+
+    // Development: check if frozen executable exists (for testing builds)
+    const frozenPath = this.getFrozenExecutablePath();
+    return fs.existsSync(frozenPath);
+  }
+
+  /**
+   * Get the path to the frozen backend executable
+   */
+  private getFrozenExecutablePath(): string {
+    const isDev = !app.isPackaged;
+
+    if (isDev) {
+      // Development: look in backend/dist/backend/
+      const exeName = process.platform === 'win32' ? 'backend.exe' : 'backend';
+      return path.join(__dirname, '../../backend/dist/backend', exeName);
+    }
+
+    // Production: executable is in resources/backend/
+    const exeName = process.platform === 'win32' ? 'backend.exe' : 'backend';
+    return path.join(process.resourcesPath, 'backend', exeName);
+  }
+
+  /**
+   * Find the Python executable (for development mode)
    */
   private findPythonExecutable(): string {
-    const isDev = !app.isPackaged;
     const backendPath = this.getBackendPath();
 
     // First, check for a virtual environment in the backend directory
@@ -55,25 +85,11 @@ export class PythonBackend {
       }
     }
 
-    if (isDev) {
-      // Development: use system Python
-      if (process.platform === 'win32') {
-        return 'python';
-      }
-      return 'python3';
-    }
-
-    // Production: look for bundled Python or fall back to system
-    const resourcesPath = process.resourcesPath;
-    const bundledPython = path.join(resourcesPath, 'python', 'python.exe');
-
-    if (fs.existsSync(bundledPython)) {
-      return bundledPython;
-    }
-
     // Fall back to system Python
-    console.warn('Bundled Python not found, using system Python');
-    return process.platform === 'win32' ? 'python' : 'python3';
+    if (process.platform === 'win32') {
+      return 'python';
+    }
+    return 'python3';
   }
 
   /**
@@ -103,12 +119,28 @@ export class PythonBackend {
     this.isShuttingDown = false;
     this.port = await this.findFreePort();
 
-    const pythonExe = this.findPythonExecutable();
-    const backendPath = this.getBackendPath();
-    const scriptPath = path.join(backendPath, 'run_backend.py');
+    const useFrozen = this.useFrozenExecutable();
+    let executable: string;
+    let args: string[];
+    let cwd: string;
 
-    console.log(`Starting Python backend: ${pythonExe} ${scriptPath}`);
-    console.log(`Backend path: ${backendPath}`);
+    if (useFrozen) {
+      // Production: use frozen executable
+      executable = this.getFrozenExecutablePath();
+      args = [];
+      cwd = path.dirname(executable);
+      console.log(`Starting frozen backend: ${executable}`);
+    } else {
+      // Development: use Python script
+      executable = this.findPythonExecutable();
+      const backendPath = this.getBackendPath();
+      const scriptPath = path.join(backendPath, 'run_backend.py');
+      args = [scriptPath];
+      cwd = backendPath;
+      console.log(`Starting Python backend: ${executable} ${scriptPath}`);
+    }
+
+    console.log(`Working directory: ${cwd}`);
     console.log(`Port: ${this.port}`);
 
     // Set environment variables
@@ -128,8 +160,8 @@ export class PythonBackend {
     }
 
     return new Promise((resolve, reject) => {
-      this.process = spawn(pythonExe, [scriptPath], {
-        cwd: backendPath,
+      this.process = spawn(executable, args, {
+        cwd,
         env,
         stdio: ['ignore', 'pipe', 'pipe'],
       });

@@ -11,19 +11,11 @@ files:
   - frontend/dist/**/*
 
 extraResources:
-  # Include Python backend
-  - from: backend
+  # Include frozen Python backend (built by PyInstaller)
+  - from: backend/dist/backend
     to: backend
     filter:
       - "**/*"
-      - "!**/__pycache__/**"
-      - "!**/*.pyc"
-      - "!**/*.pyo"
-      - "!**/venv/**"
-      - "!**/.venv/**"
-      - "!**/node_modules/**"
-      - "!**/.git/**"
-      - "!**/data/**"
 
 # Windows configuration
 win:

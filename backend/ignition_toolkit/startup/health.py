@@ -65,6 +65,7 @@ class SystemHealth:
     playbooks: ComponentHealth = field(
         default_factory=lambda: ComponentHealth(HealthStatus.UNKNOWN)
     )
+    browser: ComponentHealth = field(default_factory=lambda: ComponentHealth(HealthStatus.UNKNOWN))
     frontend: ComponentHealth = field(default_factory=lambda: ComponentHealth(HealthStatus.UNKNOWN))
     scheduler: ComponentHealth = field(default_factory=lambda: ComponentHealth(HealthStatus.UNKNOWN))
 
@@ -82,6 +83,7 @@ class SystemHealth:
                 "database": self.database.to_dict(),
                 "vault": self.vault.to_dict(),
                 "playbooks": self.playbooks.to_dict(),
+                "browser": self.browser.to_dict(),
                 "frontend": self.frontend.to_dict(),
                 "scheduler": self.scheduler.to_dict(),
             },

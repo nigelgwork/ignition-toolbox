@@ -20,6 +20,7 @@ from ignition_toolkit.startup.health import (
     set_component_healthy,
     set_component_unhealthy,
 )
+from ignition_toolkit.startup.playwright_installer import ensure_browser_installed
 from ignition_toolkit.startup.validators import (
     initialize_database,
     initialize_vault,
@@ -55,7 +56,7 @@ async def lifespan(app: FastAPI):
 
     try:
         # Phase 1: Environment Validation (CRITICAL)
-        logger.info("Phase 1/5: Environment Validation")
+        logger.info("Phase 1/8: Environment Validation")
         try:
             await validate_environment()
             logger.info("✅ Environment validated")
@@ -65,7 +66,7 @@ async def lifespan(app: FastAPI):
             raise
 
         # Phase 2: Database Initialization (CRITICAL)
-        logger.info("Phase 2/5: Database Initialization")
+        logger.info("Phase 2/8: Database Initialization")
         try:
             await initialize_database()
             set_component_healthy("database", "Database operational")
@@ -76,7 +77,7 @@ async def lifespan(app: FastAPI):
             raise
 
         # Phase 3: Credential Vault (CRITICAL)
-        logger.info("Phase 3/5: Credential Vault Initialization")
+        logger.info("Phase 3/8: Credential Vault Initialization")
         try:
             await initialize_vault()
             set_component_healthy("vault", "Vault operational")
@@ -87,7 +88,7 @@ async def lifespan(app: FastAPI):
             raise
 
         # Phase 4: Playbook Library (NON-FATAL)
-        logger.info("Phase 4/5: Playbook Library Validation")
+        logger.info("Phase 4/8: Playbook Library Validation")
         try:
             stats = await validate_playbooks()
             set_component_healthy("playbooks", f"Found {stats['total']} playbooks")
@@ -96,9 +97,26 @@ async def lifespan(app: FastAPI):
             logger.warning(f"⚠️  Playbook validation failed: {e}")
             set_component_degraded("playbooks", str(e))
 
-        # Phase 5: Frontend Build (NON-FATAL, production only)
+        # Phase 5: Playwright Browser (NON-FATAL but required for playbook execution)
+        logger.info("Phase 5/8: Playwright Browser Check")
+        try:
+            async def browser_progress(message: str, progress: float):
+                logger.info(f"   Browser: {message} ({progress*100:.0f}%)")
+
+            browser_ready = await ensure_browser_installed(progress_callback=browser_progress)
+            if browser_ready:
+                set_component_healthy("browser", "Chromium browser ready")
+                logger.info("✅ Playwright browser ready")
+            else:
+                set_component_degraded("browser", "Browser installation failed - playbooks may not work")
+                logger.warning("⚠️  Browser installation failed")
+        except Exception as e:
+            logger.warning(f"⚠️  Browser check failed: {e}")
+            set_component_degraded("browser", str(e))
+
+        # Phase 6: Frontend Build (NON-FATAL, production only)
         if not is_dev_mode():
-            logger.info("Phase 5/5: Frontend Validation")
+            logger.info("Phase 6/8: Frontend Validation")
             try:
                 await validate_frontend()
                 set_component_healthy("frontend", "Frontend build verified")
@@ -107,11 +125,11 @@ async def lifespan(app: FastAPI):
                 logger.warning(f"⚠️  Frontend validation failed: {e}")
                 set_component_degraded("frontend", str(e))
         else:
-            logger.info("Phase 5/5: Frontend Validation (SKIPPED - dev mode)")
+            logger.info("Phase 6/8: Frontend Validation (SKIPPED - dev mode)")
             set_component_healthy("frontend", "Dev mode - frontend served separately")
 
-        # Phase 6: Start Scheduler (NON-FATAL)
-        logger.info("Phase 6/6: Starting Playbook Scheduler")
+        # Phase 7: Start Scheduler (NON-FATAL)
+        logger.info("Phase 7/8: Starting Playbook Scheduler")
         try:
             from ignition_toolkit.scheduler import get_scheduler
 
@@ -123,8 +141,8 @@ async def lifespan(app: FastAPI):
             logger.warning(f"⚠️  Scheduler startup failed: {e}")
             set_component_degraded("scheduler", str(e))
 
-        # Phase 7: Initialize Application Services
-        logger.info("Phase 7/7: Initializing Application Services")
+        # Phase 8: Initialize Application Services
+        logger.info("Phase 8/8: Initializing Application Services")
         try:
             from ignition_toolkit.api.services import AppServices
 
@@ -157,6 +175,7 @@ async def lifespan(app: FastAPI):
         logger.info(f"   Database: {health.database.status.value}")
         logger.info(f"   Vault: {health.vault.status.value}")
         logger.info(f"   Playbooks: {health.playbooks.status.value}")
+        logger.info(f"   Browser: {health.browser.status.value}")
         logger.info(f"   Frontend: {health.frontend.status.value}")
         logger.info(f"   Scheduler: {health.scheduler.status.value if hasattr(health, 'scheduler') else 'N/A'}")
 
