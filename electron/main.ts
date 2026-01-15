@@ -63,10 +63,11 @@ async function startPythonBackend(): Promise<void> {
     await pythonBackend.start();
     console.log(`Python backend started on port ${pythonBackend.getPort()}`);
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('Failed to start Python backend:', error);
     dialog.showErrorBox(
       'Backend Error',
-      'Failed to start the Python backend. Please ensure Python is installed and try again.'
+      `Failed to start the backend.\n\nError: ${errorMessage}\n\nCheck the log file at:\n%APPDATA%\\ignition-toolbox\\logs\\`
     );
     app.quit();
   }
