@@ -133,10 +133,11 @@ export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
         {/* Left side: Logo and tabs */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
           {/* Logo/Title */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="h6" fontWeight="bold" color="text.primary">
               Ignition Toolbox
             </Typography>
+            <GatewayIcon sx={{ color: 'primary.main', fontSize: 20 }} />
           </Box>
 
           {/* Tab Navigation */}
@@ -259,12 +260,17 @@ export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
       <Box
         component="main"
         sx={{
-          flexGrow: 1,
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
           p: 2,
-          overflow: 'auto',
+          overflow: 'hidden',
         }}
       >
-        {children}
+        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', width: '100%' }}>
+          {children}
+        </Box>
       </Box>
     </Box>
   );
