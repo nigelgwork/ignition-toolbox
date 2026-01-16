@@ -1,18 +1,16 @@
 /**
- * Main App component with routing and providers
+ * Main App component with tab-based navigation
  */
 
-import { useMemo, useEffect } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { useState, useMemo } from 'react';
+import { HashRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { Layout } from './components/Layout';
+import { Layout, type DomainTab } from './components/Layout';
 import { Playbooks } from './pages/Playbooks';
-import { Executions } from './pages/Executions';
 import { ExecutionDetail } from './pages/ExecutionDetail';
-import { Credentials } from './pages/Credentials';
-import { About } from './pages/About';
+import { Settings } from './pages/Settings';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useStore } from './store';
 
@@ -57,8 +55,7 @@ const warpColors = {
 };
 
 function AppContent() {
-  const setWSConnected = useStore((state) => state.setWSConnected);
-  const setWSConnectionStatus = useStore((state) => state.setWSConnectionStatus);
+  const [activeTab, setActiveTab] = useState<DomainTab>('gateway');
   const setExecutionUpdate = useStore((state) => state.setExecutionUpdate);
   const setScreenshotFrame = useStore((state) => state.setScreenshotFrame);
   const themeMode = useStore((state) => state.theme);
@@ -98,22 +95,6 @@ function AppContent() {
         divider: colors.border,
       },
       components: {
-        MuiAppBar: {
-          styleOverrides: {
-            root: {
-              backgroundColor: colors.surface,
-              borderBottom: `1px solid ${colors.border}`,
-            },
-          },
-        },
-        MuiDrawer: {
-          styleOverrides: {
-            paper: {
-              backgroundColor: colors.surfaceVariant,
-              borderRight: `1px solid ${colors.border}`,
-            },
-          },
-        },
         MuiCard: {
           styleOverrides: {
             root: {
@@ -126,38 +107,79 @@ function AppContent() {
     });
   }, [themeMode]);
 
-  // Connect to WebSocket for real-time updates
-  const { connectionStatus } = useWebSocket({
-    onOpen: () => {
-      setWSConnected(true);
-      setWSConnectionStatus('connected');
-    },
-    onClose: () => {
-      setWSConnected(false);
-      setWSConnectionStatus('disconnected');
-    },
+  // Connect to WebSocket for real-time updates (silent - no UI indicators)
+  useWebSocket({
     onExecutionUpdate: (update) => setExecutionUpdate(update.execution_id, update),
     onScreenshotFrame: (frame) => setScreenshotFrame(frame.executionId, frame),
   });
 
-  // Sync WebSocket connection status to store
-  // This ensures status updates even when onOpen/onClose aren't called (during reconnects)
-  useEffect(() => {
-    setWSConnectionStatus(connectionStatus);
-  }, [connectionStatus, setWSConnectionStatus]);
+  // Render content based on active tab
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'gateway':
+        return <Playbooks domainFilter="gateway" />;
+      case 'designer':
+        return <Playbooks domainFilter="designer" />;
+      case 'perspective':
+        return <Playbooks domainFilter="perspective" />;
+      case 'settings':
+        return <Settings />;
+      default:
+        return <Playbooks domainFilter="gateway" />;
+    }
+  };
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Playbooks />} />
-          <Route path="executions" element={<Executions />} />
-          <Route path="executions/:executionId" element={<ExecutionDetail />} />
-          <Route path="credentials" element={<Credentials />} />
-          <Route path="about" element={<About />} />
-        </Route>
-      </Routes>
+      <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+        {renderContent()}
+      </Layout>
+    </ThemeProvider>
+  );
+}
+
+// Wrapper for execution detail that handles routing
+function ExecutionDetailWrapper() {
+  const { executionId } = useParams<{ executionId: string }>();
+  const navigate = useNavigate();
+  const setExecutionUpdate = useStore((state) => state.setExecutionUpdate);
+  const setScreenshotFrame = useStore((state) => state.setScreenshotFrame);
+  const themeMode = useStore((state) => state.theme);
+
+  // WebSocket for real-time updates
+  useWebSocket({
+    onExecutionUpdate: (update) => setExecutionUpdate(update.execution_id, update),
+    onScreenshotFrame: (frame) => setScreenshotFrame(frame.executionId, frame),
+  });
+
+  // Create theme
+  const theme = useMemo(() => {
+    const colors = warpColors[themeMode];
+    return createTheme({
+      palette: {
+        mode: themeMode,
+        primary: { main: colors.primary, light: themeMode === 'dark' ? '#79c0ff' : '#54aeff', dark: colors.secondary },
+        secondary: { main: colors.secondary },
+        success: { main: colors.success },
+        warning: { main: colors.warning },
+        error: { main: colors.error },
+        background: { default: colors.background, paper: colors.surface },
+        text: { primary: colors.text, secondary: colors.textSecondary },
+        divider: colors.border,
+      },
+    });
+  }, [themeMode]);
+
+  if (!executionId) {
+    navigate('/');
+    return null;
+  }
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <ExecutionDetail />
     </ThemeProvider>
   );
 }
@@ -167,7 +189,10 @@ export default function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <HashRouter>
-          <AppContent />
+          <Routes>
+            <Route path="/" element={<AppContent />} />
+            <Route path="/executions/:executionId" element={<ExecutionDetailWrapper />} />
+          </Routes>
         </HashRouter>
       </QueryClientProvider>
     </ErrorBoundary>

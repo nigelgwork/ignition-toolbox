@@ -298,7 +298,11 @@ function groupPlaybooks(playbooks: PlaybookInfo[]) {
   return { grouped, ungrouped };
 }
 
-export function Playbooks() {
+interface PlaybooksProps {
+  domainFilter?: 'gateway' | 'designer' | 'perspective';
+}
+
+export function Playbooks({ domainFilter }: PlaybooksProps) {
   const [selectedPlaybook, setSelectedPlaybook] = useState<PlaybookInfo | null>(null);
   const [dragEnabled, setDragEnabled] = useState(false);
   const [stepsDialogPlaybook, setStepsDialogPlaybook] = useState<PlaybookInfo | null>(null);
@@ -308,7 +312,7 @@ export function Playbooks() {
   const [updatesDialogOpen, setUpdatesDialogOpen] = useState(false);
   const [newPlaybookName, setNewPlaybookName] = useState('');
   const [newPlaybookDescription, setNewPlaybookDescription] = useState('');
-  const [newPlaybookDomain, setNewPlaybookDomain] = useState<'gateway' | 'perspective' | 'designer'>('gateway');
+  const [newPlaybookDomain, setNewPlaybookDomain] = useState<'gateway' | 'perspective' | 'designer'>(domainFilter || 'gateway');
 
   // Category order and expanded state
   const [categoryOrder, setCategoryOrder] = useState<string[]>(getCategoryOrder());
@@ -716,15 +720,37 @@ metadata:
     }
   };
 
+  // Get filtered playbooks based on domainFilter prop
+  const getFilteredPlaybooks = () => {
+    if (!domainFilter) return null;
+    switch (domainFilter) {
+      case 'gateway': return gatewayPlaybooks;
+      case 'designer': return designerPlaybooks;
+      case 'perspective': return perspectivePlaybooks;
+      default: return null;
+    }
+  };
+
+  const filteredPlaybooks = getFilteredPlaybooks();
+
+  // Domain display names
+  const domainNames: Record<string, string> = {
+    gateway: 'Gateway',
+    designer: 'Designer',
+    perspective: 'Perspective',
+  };
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, py: 0.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
           <Typography variant="h5" sx={{ fontSize: '1.3rem' }}>
-            Playbooks
+            {domainFilter ? `${domainNames[domainFilter]} Playbooks` : 'Playbooks'}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
-            Select a playbook to configure and execute
+            {domainFilter
+              ? `${filteredPlaybooks?.length || 0} playbooks available`
+              : 'Select a playbook to configure and execute'}
           </Typography>
         </Box>
 
@@ -827,8 +853,113 @@ metadata:
         </Alert>
       )}
 
-      {/* Organized Playbook Sections */}
-      {!isLoading && !error && (
+      {/* Empty state for filtered domain */}
+      {!isLoading && !error && domainFilter && filteredPlaybooks && filteredPlaybooks.length === 0 && (
+        <Alert severity="info">
+          No {domainNames[domainFilter]} playbooks found. Create one or browse the library.
+        </Alert>
+      )}
+
+      {/* Filtered Domain View (single domain, no accordions) */}
+      {!isLoading && !error && domainFilter && filteredPlaybooks && filteredPlaybooks.length > 0 && (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={
+          domainFilter === 'gateway' ? handleGatewayDragEnd :
+          domainFilter === 'designer' ? handleDesignerDragEnd :
+          handlePerspectiveDragEnd
+        }>
+          <SortableContext items={filteredPlaybooks.map(p => p.path)} strategy={verticalListSortingStrategy}>
+            {(() => {
+              const { grouped, ungrouped } = groupPlaybooks(filteredPlaybooks);
+              return (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {/* Ungrouped playbooks */}
+                  {ungrouped.length > 0 && (
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: {
+                          xs: '1fr',
+                          sm: 'repeat(2, 1fr)',
+                          md: 'repeat(3, 1fr)',
+                          lg: 'repeat(4, 1fr)',
+                          xl: 'repeat(5, 1fr)',
+                        },
+                        gap: 2,
+                      }}
+                    >
+                      {ungrouped.map((playbook) => (
+                        <SortablePlaybookCard
+                          key={playbook.path}
+                          playbook={playbook}
+                          onConfigure={handleConfigure}
+                          onExecute={handleExecute}
+                          onExport={handleExport}
+                          onViewSteps={handleViewSteps}
+                          dragEnabled={dragEnabled}
+                        />
+                      ))}
+                    </Box>
+                  )}
+
+                  {/* Grouped playbooks */}
+                  {Object.entries(grouped).map(([groupName, groupPlaybooks]) => (
+                    <Accordion
+                      key={groupName}
+                      expanded={dragEnabled || (expandedGroups[groupName] !== undefined ? expandedGroups[groupName] : false)}
+                      onChange={() => {
+                        if (!dragEnabled) {
+                          setExpandedGroups(prev => {
+                            const newState = { ...prev, [groupName]: prev[groupName] !== undefined ? !prev[groupName] : true };
+                            saveGroupExpandedState(newState);
+                            return newState;
+                          });
+                        }
+                      }}
+                      sx={{ bgcolor: 'background.paper', boxShadow: 1 }}
+                    >
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: '32px !important', '& .MuiAccordionSummary-content': { my: '6px !important' } }}>
+                        <Typography variant="subtitle1" sx={{ fontSize: '0.95rem', fontWeight: 500 }}>
+                          {groupName} ({groupPlaybooks.length})
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Box
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: {
+                              xs: '1fr',
+                              sm: 'repeat(2, 1fr)',
+                              md: 'repeat(3, 1fr)',
+                              lg: 'repeat(4, 1fr)',
+                              xl: 'repeat(5, 1fr)',
+                            },
+                            gap: 2,
+                          }}
+                        >
+                          {groupPlaybooks.map((playbook) => (
+                            <SortablePlaybookCard
+                              key={playbook.path}
+                              playbook={playbook}
+                              onConfigure={handleConfigure}
+                              onExecute={handleExecute}
+                              onExport={handleExport}
+                              onViewSteps={handleViewSteps}
+                              dragEnabled={dragEnabled}
+                            />
+                          ))}
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  ))}
+                </Box>
+              );
+            })()}
+          </SortableContext>
+        </DndContext>
+      )}
+
+      {/* Organized Playbook Sections (all domains, with accordions) */}
+      {!isLoading && !error && !domainFilter && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
           <SortableContext items={categoryOrder} strategy={verticalListSortingStrategy}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
