@@ -433,7 +433,7 @@ export function Executions() {
           <Table size="medium" sx={{ tableLayout: 'fixed', width: '100%' }}>
             <TableHead>
               <TableRow>
-                <TableCell width="50px" padding="checkbox">
+                <TableCell width="5%" padding="checkbox">
                   <Checkbox
                     indeterminate={selectedIds.size > 0 && selectedIds.size < filteredExecutions.length}
                     checked={filteredExecutions.length > 0 && selectedIds.size === filteredExecutions.length}
@@ -441,13 +441,13 @@ export function Executions() {
                     inputProps={{ 'aria-label': 'Select all executions' }}
                   />
                 </TableCell>
-                <TableCell width="50px"></TableCell>
-                <TableCell width="280px">Playbook</TableCell>
-                <TableCell width="140px">Status</TableCell>
-                <TableCell width="100px">Progress</TableCell>
-                <TableCell width="200px">Started</TableCell>
-                <TableCell width="100px">Duration</TableCell>
-                <TableCell align="right">Actions</TableCell>
+                <TableCell width="5%"></TableCell>
+                <TableCell width="25%">Playbook</TableCell>
+                <TableCell width="10%">Status</TableCell>
+                <TableCell width="10%">Progress</TableCell>
+                <TableCell width="20%">Started</TableCell>
+                <TableCell width="10%">Duration</TableCell>
+                <TableCell width="15%" align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

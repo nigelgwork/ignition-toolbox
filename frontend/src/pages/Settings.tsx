@@ -206,6 +206,7 @@ export function Settings() {
         <Paper
           sx={{
             p: 4,
+            width: '100%',
             textAlign: 'center',
             bgcolor: 'background.paper',
             border: '1px solid',
@@ -224,6 +225,7 @@ export function Settings() {
         <Paper
           sx={{
             p: 3,
+            width: '100%',
             bgcolor: 'background.paper',
             border: '1px solid',
             borderColor: 'divider',
@@ -381,11 +383,12 @@ export function Settings() {
         About Ignition Toolbox
       </Typography>
 
-      <Stack spacing={3}>
+      <Stack spacing={3} sx={{ width: '100%' }}>
         {/* App Info Card */}
         <Paper
           sx={{
             p: 4,
+            width: '100%',
             textAlign: 'center',
             bgcolor: 'background.paper',
             border: '1px solid',
@@ -423,6 +426,7 @@ export function Settings() {
         <Paper
           sx={{
             p: 3,
+            width: '100%',
             bgcolor: 'background.paper',
             border: '1px solid',
             borderColor: 'divider',
@@ -486,6 +490,7 @@ export function Settings() {
       <Paper
         sx={{
           p: 3,
+          width: '100%',
           bgcolor: 'background.paper',
           border: '1px solid',
           borderColor: 'divider',
