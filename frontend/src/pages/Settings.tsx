@@ -545,7 +545,7 @@ export function Settings() {
         </Typography>
       </Box>
 
-      <Box sx={{ display: 'flex', gap: 3, flex: 1, minHeight: 0, width: '100%', overflow: 'hidden' }}>
+      <Box sx={{ display: 'flex', gap: 3, flex: 1, width: '100%' }}>
         {/* Sidebar */}
         <Paper
           elevation={0}
@@ -600,20 +600,16 @@ export function Settings() {
 
         {/* Content - fills remaining width */}
         <Box sx={{
-          flex: 1,
+          flex: '1 1 auto',
           minWidth: 0,
-          minHeight: 0,
           overflow: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
+          width: '100%',
         }}>
-          <Box sx={{ flex: 1, width: '100%' }}>
-            {activeTab === 'credentials' && <Credentials />}
-            {activeTab === 'executions' && <Executions />}
-            {activeTab === 'updates' && renderUpdatesContent()}
-            {activeTab === 'appearance' && renderAppearanceContent()}
-            {activeTab === 'about' && renderAboutContent()}
-          </Box>
+          {activeTab === 'credentials' && <Credentials />}
+          {activeTab === 'executions' && <Executions />}
+          {activeTab === 'updates' && renderUpdatesContent()}
+          {activeTab === 'appearance' && renderAppearanceContent()}
+          {activeTab === 'about' && renderAboutContent()}
         </Box>
       </Box>
     </Box>
