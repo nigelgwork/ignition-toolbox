@@ -46,7 +46,11 @@ interface AppState {
   theme: 'dark' | 'light';
   setTheme: (theme: 'dark' | 'light') => void;
 
-  // Global credential selection
+  // Global credential name (for header dropdown)
+  globalCredential: string | null;
+  setGlobalCredential: (name: string | null) => void;
+
+  // Global credential selection (full credential object)
   selectedCredential: CredentialInfo | SessionCredential | null;
   setSelectedCredential: (credential: CredentialInfo | SessionCredential | null) => void;
 
@@ -87,6 +91,9 @@ export const useStore = create<AppState>((set) => ({
     localStorage.setItem('theme', theme);
     set({ theme });
   },
+
+  globalCredential: null,
+  setGlobalCredential: (name) => set({ globalCredential: name }),
 
   selectedCredential: null,
   setSelectedCredential: (credential) => set({ selectedCredential: credential }),
