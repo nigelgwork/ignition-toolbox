@@ -136,7 +136,7 @@ export function Settings() {
   };
 
   const renderUpdatesContent = () => (
-    <Box sx={{ height: '100%' }}>
+    <Box sx={{ width: '100%', maxWidth: '100%' }}>
       <Typography variant="h6" sx={{ mb: 3 }}>
         Software Updates
       </Typography>
@@ -315,7 +315,7 @@ export function Settings() {
   );
 
   const renderAboutContent = () => (
-    <Box sx={{ height: '100%' }}>
+    <Box sx={{ width: '100%', maxWidth: '100%' }}>
       <Typography variant="h6" sx={{ mb: 3 }}>
         About Ignition Toolbox
       </Typography>
@@ -417,7 +417,7 @@ export function Settings() {
   );
 
   const renderAppearanceContent = () => (
-    <Box>
+    <Box sx={{ width: '100%', maxWidth: '100%' }}>
       <Typography variant="h6" sx={{ mb: 3 }}>
         Appearance
       </Typography>
