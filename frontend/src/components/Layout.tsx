@@ -134,10 +134,10 @@ export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
           {/* Logo/Title */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <GatewayIcon sx={{ color: 'primary.main', fontSize: 24 }} />
             <Typography variant="h6" fontWeight="bold" color="text.primary">
               Ignition Toolbox
             </Typography>
-            <GatewayIcon sx={{ color: 'primary.main', fontSize: 20 }} />
           </Box>
 
           {/* Tab Navigation */}
