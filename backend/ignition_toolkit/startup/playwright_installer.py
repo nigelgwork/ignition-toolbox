@@ -117,14 +117,21 @@ async def install_browser(progress_callback=None) -> bool:
         if progress_callback:
             await progress_callback("Downloading Chromium browser...", 0.1)
 
-        # Run installation
+        # Run installation with timeout (5 minutes max)
         process = await asyncio.create_subprocess_exec(
             *playwright_cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
 
-        stdout, stderr = await process.communicate()
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300)
+        except asyncio.TimeoutError:
+            logger.error("Browser installation timed out after 5 minutes")
+            process.kill()
+            if progress_callback:
+                await progress_callback("Installation timed out", 1.0)
+            return False
 
         if process.returncode == 0:
             logger.info("Playwright Chromium browser installed successfully")
@@ -178,14 +185,21 @@ async def _install_browser_via_driver(progress_callback=None) -> bool:
         if progress_callback:
             await progress_callback("Downloading Chromium browser...", 0.2)
 
-        # Run the driver with install command
+        # Run the driver with install command (5 minute timeout)
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
 
-        stdout, stderr = await process.communicate()
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300)
+        except asyncio.TimeoutError:
+            logger.error("Driver browser installation timed out after 5 minutes")
+            process.kill()
+            if progress_callback:
+                await progress_callback("Installation timed out", 1.0)
+            return False
 
         stdout_text = stdout.decode() if stdout else ""
         stderr_text = stderr.decode() if stderr else ""
