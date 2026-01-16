@@ -20,7 +20,6 @@ from ignition_toolkit.startup.health import (
     set_component_healthy,
     set_component_unhealthy,
 )
-from ignition_toolkit.startup.playwright_installer import ensure_browser_installed
 from ignition_toolkit.startup.validators import (
     initialize_database,
     initialize_vault,
@@ -98,18 +97,19 @@ async def lifespan(app: FastAPI):
             set_component_degraded("playbooks", str(e))
 
         # Phase 5: Playwright Browser (NON-FATAL but required for playbook execution)
+        # NOTE: Browser installation can take minutes to download ~170MB, so we only
+        # CHECK if installed during startup. Actual installation happens on first playbook run.
         logger.info("Phase 5/8: Playwright Browser Check")
         try:
-            async def browser_progress(message: str, progress: float):
-                logger.info(f"   Browser: {message} ({progress*100:.0f}%)")
+            from ignition_toolkit.startup.playwright_installer import is_browser_installed
 
-            browser_ready = await ensure_browser_installed(progress_callback=browser_progress)
-            if browser_ready:
+            if is_browser_installed():
                 set_component_healthy("browser", "Chromium browser ready")
                 logger.info("✅ Playwright browser ready")
             else:
-                set_component_degraded("browser", "Browser installation failed - playbooks may not work")
-                logger.warning("⚠️  Browser installation failed")
+                # Don't block startup with browser download - it will install on first use
+                set_component_degraded("browser", "Browser not installed - will download on first playbook run")
+                logger.warning("⚠️  Browser not installed - will download on first playbook run (~170MB)")
         except Exception as e:
             logger.warning(f"⚠️  Browser check failed: {e}")
             set_component_degraded("browser", str(e))

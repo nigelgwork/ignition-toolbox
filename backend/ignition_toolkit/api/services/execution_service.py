@@ -109,6 +109,10 @@ class ExecutionService:
         )
         playbook = PlaybookLoader.load_from_file(full_playbook_path)
 
+        # Step 1.5: Ensure browser is installed for playbooks that need it
+        if playbook.domain and playbook.domain.lower() != "gateway":
+            await self._ensure_browser_available()
+
         # Step 2: Apply credential autofill
         gateway_url, parameters = self.credential_manager.apply_autofill(
             playbook=playbook,
@@ -382,3 +386,40 @@ class ExecutionService:
             pass  # Watchdog cancelled (normal if execution finishes)
         except Exception as e:
             logger.exception(f"Error in timeout watchdog for {execution_id}: {e}")
+
+    async def _ensure_browser_available(self) -> None:
+        """
+        Ensure Playwright browser is installed before running browser-based playbooks.
+
+        This is called on-demand when executing Perspective or Designer playbooks,
+        rather than blocking app startup with a large download.
+
+        Raises:
+            HTTPException: If browser installation fails
+        """
+        from ignition_toolkit.startup.playwright_installer import (
+            ensure_browser_installed,
+            is_browser_installed,
+        )
+
+        if is_browser_installed():
+            return
+
+        logger.info("Browser not installed - downloading Chromium (~170MB)...")
+
+        try:
+            success = await ensure_browser_installed()
+            if not success:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Browser installation failed. Please check network connectivity and try again.",
+                )
+            logger.info("Browser installed successfully")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.exception(f"Browser installation error: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail=f"Browser installation failed: {e}",
+            )
