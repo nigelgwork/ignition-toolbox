@@ -2,19 +2,25 @@
 WebSocket endpoints router
 
 Handles real-time updates for playbook executions and Claude Code PTY sessions.
+Note: PTY terminal sessions are only available on Unix systems.
 """
 
 import asyncio
 import logging
 import os
-import pty
-import select
 import shutil
 import signal
 import subprocess
-import termios
-import tty
+import sys
 from datetime import datetime
+
+# PTY modules are Unix-only - import conditionally
+IS_WINDOWS = sys.platform == "win32"
+if not IS_WINDOWS:
+    import pty
+    import select
+    import termios
+    import tty
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -136,10 +142,20 @@ async def claude_code_terminal(websocket: WebSocket, execution_id: str):
     This endpoint spawns an interactive bash shell for Claude Code debugging.
     While scoped to the playbook directory, it still provides shell access.
     Use only in development or with trusted playbooks.
+
+    Note: This feature requires Unix PTY support and is not available on Windows.
     """
     logger.info(f"[TERMINAL DEBUG] WebSocket connection request for execution: {execution_id}")
     await websocket.accept()
     logger.info(f"[TERMINAL DEBUG] WebSocket accepted for execution: {execution_id}")
+
+    # PTY terminal sessions are not supported on Windows
+    if IS_WINDOWS:
+        await websocket.send_json(
+            {"type": "error", "message": "Terminal sessions are not supported on Windows"}
+        )
+        await websocket.close(code=1008, reason="Not supported on Windows")
+        return
 
     master_fd = None
     process = None
@@ -424,12 +440,22 @@ async def shell_terminal(websocket: WebSocket):
     - Run in containerized environment
     - Add comprehensive audit logging
     - Consider disabling entirely in production
+
+    Note: This feature requires Unix PTY support and is not available on Windows.
     """
     # Get working directory from query params
     working_dir = websocket.query_params.get("path", str(get_playbooks_dir().resolve()))
 
     await websocket.accept()
     logger.info(f"Shell WebSocket connected, working directory: {working_dir}")
+
+    # PTY terminal sessions are not supported on Windows
+    if IS_WINDOWS:
+        await websocket.send_json(
+            {"type": "error", "message": "Shell terminal is not supported on Windows"}
+        )
+        await websocket.close(code=1008, reason="Not supported on Windows")
+        return
 
     master_fd = None
     process = None
