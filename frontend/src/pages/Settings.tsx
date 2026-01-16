@@ -93,6 +93,67 @@ export function Settings() {
     api.health().then(setHealth).catch(() => {});
   }, []);
 
+  // Listen for update events from Electron
+  useEffect(() => {
+    if (!isElectron() || !window.electronAPI) return;
+
+    const unsubscribeProgress = window.electronAPI.on('update:progress', (data) => {
+      const status = data as UpdateStatus;
+      setUpdateStatus((prev) => ({
+        ...prev,
+        downloading: true,
+        progress: status.progress,
+      }));
+    });
+
+    const unsubscribeDownloaded = window.electronAPI.on('update:downloaded', (data) => {
+      const status = data as UpdateStatus;
+      setUpdateStatus((prev) => ({
+        ...prev,
+        downloading: false,
+        downloaded: true,
+        progress: 100,
+        updateInfo: status.updateInfo || prev.updateInfo,
+      }));
+    });
+
+    const unsubscribeError = window.electronAPI.on('update:error', (data) => {
+      const status = data as UpdateStatus;
+      setUpdateStatus((prev) => ({
+        ...prev,
+        checking: false,
+        downloading: false,
+        error: status.error,
+      }));
+    });
+
+    const unsubscribeAvailable = window.electronAPI.on('update:available', (data) => {
+      const status = data as UpdateStatus;
+      setUpdateStatus((prev) => ({
+        ...prev,
+        checking: false,
+        available: true,
+        updateInfo: status.updateInfo,
+      }));
+    });
+
+    const unsubscribeNotAvailable = window.electronAPI.on('update:not-available', () => {
+      setUpdateStatus((prev) => ({
+        ...prev,
+        checking: false,
+        available: false,
+      }));
+    });
+
+    return () => {
+      unsubscribeProgress();
+      unsubscribeDownloaded();
+      unsubscribeError();
+      unsubscribeAvailable();
+      unsubscribeNotAvailable();
+    };
+  }, []);
+
   const handleCheckUpdate = async () => {
     if (!isElectron() || !window.electronAPI) return;
     setUpdateStatus((prev) => ({ ...prev, checking: true, error: undefined }));
