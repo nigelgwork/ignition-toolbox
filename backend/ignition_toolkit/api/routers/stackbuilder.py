@@ -5,8 +5,10 @@ Provides endpoints for building Docker Compose stacks with
 automatic service integration detection and configuration generation.
 """
 
+import io
 import logging
 import re
+import zipfile
 from functools import lru_cache
 from typing import Any
 
@@ -456,4 +458,440 @@ async def delete_saved_stack(stack_id: int):
         raise
     except Exception as e:
         logger.error(f"Error deleting stack: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Docker Installer Downloads
+# ============================================================================
+
+
+DOCKER_INSTALL_LINUX = '''#!/bin/bash
+# Docker Installation Script for Linux
+# Supports: Ubuntu, Debian, CentOS, RHEL, Fedora, Arch
+
+set -e
+
+echo "=========================================="
+echo "     Docker Installation Script"
+echo "=========================================="
+echo ""
+
+# Detect OS
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$ID
+    VERSION=$VERSION_ID
+else
+    echo "Cannot detect OS. Please install Docker manually."
+    exit 1
+fi
+
+echo "Detected OS: $OS $VERSION"
+echo ""
+
+install_docker_debian() {
+    echo "Installing Docker on Debian/Ubuntu..."
+
+    # Remove old versions
+    sudo apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+
+    # Install dependencies
+    sudo apt-get update
+    sudo apt-get install -y ca-certificates curl gnupg lsb-release
+
+    # Add Docker GPG key
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/$OS/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+    # Set up repository
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$OS $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    # Install Docker
+    sudo apt-get update
+    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+}
+
+install_docker_rhel() {
+    echo "Installing Docker on RHEL/CentOS/Fedora..."
+
+    # Remove old versions
+    sudo yum remove -y docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine 2>/dev/null || true
+
+    # Install dependencies
+    sudo yum install -y yum-utils
+
+    # Set up repository
+    sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+    # Install Docker
+    sudo yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+}
+
+install_docker_arch() {
+    echo "Installing Docker on Arch Linux..."
+    sudo pacman -Sy docker docker-compose --noconfirm
+}
+
+# Install based on OS
+case $OS in
+    ubuntu|debian)
+        install_docker_debian
+        ;;
+    centos|rhel|fedora)
+        install_docker_rhel
+        ;;
+    arch)
+        install_docker_arch
+        ;;
+    *)
+        echo "Unsupported OS: $OS"
+        echo "Please install Docker manually from https://docs.docker.com/engine/install/"
+        exit 1
+        ;;
+esac
+
+# Start Docker service
+echo ""
+echo "Starting Docker service..."
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Add current user to docker group
+echo "Adding $USER to docker group..."
+sudo usermod -aG docker $USER
+
+echo ""
+echo "=========================================="
+echo "     Docker Installation Complete!"
+echo "=========================================="
+echo ""
+echo "Please log out and back in for group changes to take effect."
+echo ""
+echo "Verify installation:"
+echo "  docker --version"
+echo "  docker compose version"
+echo ""
+'''
+
+DOCKER_INSTALL_WINDOWS = '''# Docker Desktop Installation Script for Windows
+# Run in PowerShell as Administrator
+
+Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host "     Docker Desktop Installation Script" -ForegroundColor Cyan
+Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Check if running as Administrator
+$currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Host "ERROR: This script must be run as Administrator" -ForegroundColor Red
+    Write-Host "Right-click PowerShell and select 'Run as Administrator'" -ForegroundColor Yellow
+    exit 1
+}
+
+# Check Windows version
+$osInfo = Get-WmiObject -Class Win32_OperatingSystem
+$osVersion = [System.Version]$osInfo.Version
+if ($osVersion.Major -lt 10) {
+    Write-Host "ERROR: Docker Desktop requires Windows 10 or later" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Detected: $($osInfo.Caption)" -ForegroundColor Green
+Write-Host ""
+
+# Check if Docker is already installed
+$dockerPath = Get-Command docker -ErrorAction SilentlyContinue
+if ($dockerPath) {
+    Write-Host "Docker is already installed at: $($dockerPath.Source)" -ForegroundColor Yellow
+    docker --version
+    Write-Host ""
+    $continue = Read-Host "Continue with reinstallation? (y/n)"
+    if ($continue -ne "y") {
+        exit 0
+    }
+}
+
+# Enable WSL2
+Write-Host "Enabling Windows Subsystem for Linux..." -ForegroundColor Cyan
+dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+
+Write-Host "Enabling Virtual Machine Platform..." -ForegroundColor Cyan
+dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+
+# Download Docker Desktop installer
+$installerUrl = "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
+$installerPath = "$env:TEMP\\DockerDesktopInstaller.exe"
+
+Write-Host ""
+Write-Host "Downloading Docker Desktop installer..." -ForegroundColor Cyan
+Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
+
+# Install Docker Desktop
+Write-Host "Installing Docker Desktop..." -ForegroundColor Cyan
+Start-Process -FilePath $installerPath -ArgumentList "install --quiet --accept-license" -Wait
+
+# Clean up
+Remove-Item $installerPath -Force
+
+Write-Host ""
+Write-Host "==========================================" -ForegroundColor Green
+Write-Host "     Docker Desktop Installation Complete!" -ForegroundColor Green
+Write-Host "==========================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "IMPORTANT: Please restart your computer to complete the installation." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "After restart:" -ForegroundColor Cyan
+Write-Host "  1. Launch Docker Desktop from the Start menu"
+Write-Host "  2. Complete the initial setup wizard"
+Write-Host "  3. Verify installation: docker --version"
+Write-Host ""
+'''
+
+
+@router.get("/download/docker-installer/linux")
+async def download_docker_installer_linux():
+    """Download Docker installation script for Linux"""
+    return StreamingResponse(
+        iter([DOCKER_INSTALL_LINUX.encode()]),
+        media_type="text/plain",
+        headers={
+            "Content-Disposition": 'attachment; filename="install-docker-linux.sh"'
+        },
+    )
+
+
+@router.get("/download/docker-installer/windows")
+async def download_docker_installer_windows():
+    """Download Docker installation script for Windows"""
+    return StreamingResponse(
+        iter([DOCKER_INSTALL_WINDOWS.encode()]),
+        media_type="text/plain",
+        headers={
+            "Content-Disposition": 'attachment; filename="install-docker-windows.ps1"'
+        },
+    )
+
+
+# ============================================================================
+# Offline Bundle Generation
+# ============================================================================
+
+
+@router.post("/generate-offline-bundle")
+async def generate_offline_bundle(stack_config: StackConfig):
+    """
+    Generate an offline deployment bundle including:
+    - Docker Compose files
+    - Image pull script (for connected system)
+    - Image load script (for offline system)
+    - README with instructions
+    """
+    try:
+        instances = [
+            {
+                "app_id": inst.app_id,
+                "instance_name": inst.instance_name,
+                "config": inst.config,
+            }
+            for inst in stack_config.instances
+        ]
+
+        global_settings = None
+        if stack_config.global_settings:
+            global_settings = GlobalSettings(
+                stack_name=stack_config.global_settings.stack_name,
+                timezone=stack_config.global_settings.timezone,
+                restart_policy=stack_config.global_settings.restart_policy,
+            )
+
+        integration_settings = None
+        if stack_config.integration_settings:
+            integration_settings = IntegrationSettings(
+                reverse_proxy=stack_config.integration_settings.reverse_proxy,
+                mqtt=stack_config.integration_settings.mqtt,
+                oauth=stack_config.integration_settings.oauth,
+                database=stack_config.integration_settings.database,
+                email=stack_config.integration_settings.email,
+            )
+
+        generator = ComposeGenerator()
+        result = generator.generate(instances, global_settings, integration_settings)
+
+        # Collect images from the compose output
+        catalog = get_service_catalog()
+        catalog_dict = catalog.get_application_as_dict()
+
+        images = []
+        for inst in instances:
+            app = catalog_dict.get(inst["app_id"])
+            if app and app.get("enabled", False):
+                version = inst.get("config", {}).get("version", app.get("default_version", "latest"))
+                images.append(f"{app['image']}:{version}")
+
+        # Generate pull script
+        pull_script = f'''#!/bin/bash
+# Pull all Docker images for offline deployment
+# Run this on a machine with internet access
+
+set -e
+
+echo "Pulling Docker images..."
+echo ""
+
+IMAGES=(
+{chr(10).join(f'    "{img}"' for img in images)}
+)
+
+for IMAGE in "${{IMAGES[@]}}"; do
+    echo "Pulling $IMAGE..."
+    docker pull "$IMAGE"
+done
+
+echo ""
+echo "Saving images to archive..."
+docker save ${{IMAGES[@]}} | gzip > docker-images.tar.gz
+
+echo ""
+echo "Done! Transfer docker-images.tar.gz to your offline system."
+echo "File size: $(du -h docker-images.tar.gz | cut -f1)"
+'''
+
+        # Generate load script
+        load_script = '''#!/bin/bash
+# Load Docker images from archive
+# Run this on your offline/airgapped system
+
+set -e
+
+if [ ! -f docker-images.tar.gz ]; then
+    echo "ERROR: docker-images.tar.gz not found"
+    echo "Please run pull-images.sh on a connected system first"
+    exit 1
+fi
+
+echo "Loading Docker images..."
+gunzip -c docker-images.tar.gz | docker load
+
+echo ""
+echo "Images loaded successfully!"
+echo "You can now run: docker compose up -d"
+'''
+
+        # Generate offline README
+        stack_name = "iiot-stack"
+        if global_settings:
+            stack_name = global_settings.stack_name
+
+        offline_readme = f'''# {stack_name} - Offline Deployment
+
+## Overview
+
+This bundle contains everything needed for airgapped/offline deployment.
+
+## Included Files
+
+- `docker-compose.yml` - Docker Compose configuration
+- `.env` - Environment variables
+- `README.md` - This file
+- `pull-images.sh` - Run on connected system to download images
+- `load-images.sh` - Run on offline system to load images
+- `configs/` - Service configuration files
+
+## Deployment Steps
+
+### On Connected System (with Internet)
+
+1. Copy this bundle to a system with Docker and internet access
+2. Make pull script executable:
+   ```bash
+   chmod +x pull-images.sh
+   ```
+3. Pull all images:
+   ```bash
+   ./pull-images.sh
+   ```
+4. This creates `docker-images.tar.gz` (~{len(images) * 300}MB estimated)
+
+### Transfer to Offline System
+
+5. Copy the entire bundle including `docker-images.tar.gz` to your offline system
+   - USB drive
+   - Network share
+   - Secure file transfer
+
+### On Offline System
+
+6. Make load script executable:
+   ```bash
+   chmod +x load-images.sh
+   ```
+7. Load the images:
+   ```bash
+   ./load-images.sh
+   ```
+8. Start the stack:
+   ```bash
+   docker compose up -d
+   ```
+
+## Images Included
+
+{chr(10).join(f"- {img}" for img in images)}
+
+## Troubleshooting
+
+**"docker-images.tar.gz not found"**
+- Run pull-images.sh on a connected system first
+
+**"No space left on device"**
+- Images require approximately {len(images) * 500}MB disk space
+- Ensure sufficient space before loading
+
+**Permission denied**
+- Ensure scripts are executable: chmod +x *.sh
+- Run as user in docker group or with sudo
+'''
+
+        # Create ZIP file
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            zip_file.writestr("docker-compose.yml", result["docker_compose"])
+            zip_file.writestr(".env", result["env"])
+            zip_file.writestr("README.md", offline_readme)
+
+            # Add pull/load scripts with executable permissions
+            pull_info = zipfile.ZipInfo("pull-images.sh")
+            pull_info.external_attr = 0o755 << 16
+            zip_file.writestr(pull_info, pull_script)
+
+            load_info = zipfile.ZipInfo("load-images.sh")
+            load_info.external_attr = 0o755 << 16
+            zip_file.writestr(load_info, load_script)
+
+            for file_path, content in result.get("config_files", {}).items():
+                info = zipfile.ZipInfo(file_path)
+                info.external_attr = 0o644 << 16
+                zip_file.writestr(info, content)
+
+            for file_path, content in result.get("startup_scripts", {}).items():
+                info = zipfile.ZipInfo(file_path)
+                info.external_attr = 0o755 << 16
+                zip_file.writestr(info, content)
+
+            zip_file.writestr("configs/.gitkeep", "")
+
+        zip_buffer.seek(0)
+
+        return StreamingResponse(
+            iter([zip_buffer.getvalue()]),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{stack_name}-offline.zip"'
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error generating offline bundle: {e}")
         raise HTTPException(status_code=500, detail=str(e))

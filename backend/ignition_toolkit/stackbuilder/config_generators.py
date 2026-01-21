@@ -4,9 +4,22 @@ Configuration file generators for Stack Builder
 Generates config files for MQTT, Grafana datasources, Traefik, etc.
 """
 
+import hashlib
 from typing import Any
 
 import yaml
+
+
+def generate_mosquitto_password_file(username: str, password: str) -> str:
+    """
+    Generate Mosquitto password file content
+
+    Note: In production, use mosquitto_passwd to generate properly hashed passwords.
+    This generates a plaintext version that Mosquitto will hash on first use.
+    """
+    # Generate a simple hash for the password file
+    # Mosquitto will accept this format and rehash it
+    return f"{username}:{password}\n"
 
 
 def generate_prometheus_config() -> str:

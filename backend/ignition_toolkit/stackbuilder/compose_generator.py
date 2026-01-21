@@ -14,13 +14,25 @@ import yaml
 
 from ignition_toolkit.stackbuilder.catalog import get_service_catalog
 from ignition_toolkit.stackbuilder.config_generators import (
+    generate_email_env_vars,
     generate_grafana_datasources,
     generate_mosquitto_config,
+    generate_mosquitto_password_file,
+    generate_oauth_env_vars,
     generate_prometheus_config,
     generate_traefik_dynamic_config,
     generate_traefik_static_config,
 )
+from ignition_toolkit.stackbuilder.ignition_db_registration import (
+    generate_ignition_db_readme_section,
+    generate_ignition_db_registration_script,
+    generate_requirements_file,
+)
 from ignition_toolkit.stackbuilder.integration_engine import get_integration_engine
+from ignition_toolkit.stackbuilder.keycloak_generator import (
+    generate_keycloak_readme_section,
+    generate_keycloak_realm,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +76,7 @@ class IntegrationSettings:
         self.oauth = oauth or {
             "realm_name": "iiot",
             "auto_configure_services": True,
+            "realm_users": [],
         }
         self.database = database or {"auto_register": True}
         self.email = email or {
@@ -81,6 +94,9 @@ class ComposeGenerator:
     - .env file
     - Configuration files for services
     - README documentation
+    - Startup scripts for Ignition
+    - Database registration scripts
+    - Keycloak realm configuration
     """
 
     def __init__(self):
@@ -121,6 +137,7 @@ class ComposeGenerator:
             for inst in instances
         ]
         integration_results = self.engine.detect_integrations(instances_for_detection)
+        integrations = integration_results.get("integrations", {})
 
         # Build docker compose structure
         stack_name = global_settings.stack_name
@@ -142,6 +159,39 @@ class ComposeGenerator:
 
         # Check what's in the stack
         has_traefik = any(inst["app_id"] == "traefik" for inst in instances)
+        has_oauth_provider = "oauth_provider" in integrations
+        has_email_testing = "email_testing" in integrations
+        has_mqtt_broker = "mqtt_broker" in integrations
+        has_ignition = any(inst["app_id"] == "ignition" for inst in instances)
+
+        # Pre-generate Keycloak realm configuration if needed
+        keycloak_clients = []
+        keycloak_realm_config = None
+        if has_oauth_provider and integration_settings.oauth.get(
+            "auto_configure_services", True
+        ):
+            oauth_int = integrations["oauth_provider"]
+            keycloak_providers = [
+                p for p in oauth_int.get("providers", []) if p["service_id"] == "keycloak"
+            ]
+
+            if keycloak_providers:
+                oauth_client_services = [
+                    client["service_id"] for client in oauth_int.get("clients", [])
+                ]
+                realm_users = integration_settings.oauth.get("realm_users", [])
+                realm_name = integration_settings.oauth.get("realm_name", "iiot")
+                base_domain = integration_settings.reverse_proxy.get("base_domain", "localhost")
+                enable_https = integration_settings.reverse_proxy.get("enable_https", False)
+
+                keycloak_realm_config = generate_keycloak_realm(
+                    realm_name=realm_name,
+                    services=oauth_client_services,
+                    users=realm_users,
+                    base_domain=base_domain,
+                    enable_https=enable_https,
+                )
+                keycloak_clients = keycloak_realm_config.get("clients", [])
 
         # Process each instance
         for instance in instances:
@@ -170,7 +220,7 @@ class ComposeGenerator:
                 for port_mapping in app["default_config"]["ports"]:
                     if ":" in port_mapping:
                         container_port = port_mapping.split(":")[1]
-                        host_port = config.get("port", port_mapping.split(":")[0])
+                        host_port = self._get_host_port(instance["app_id"], config, port_mapping)
                         ports.append(f"{host_port}:{container_port}")
                     else:
                         ports.append(port_mapping)
@@ -182,7 +232,14 @@ class ComposeGenerator:
                 env["TZ"] = global_settings.timezone
 
                 # Apply app-specific config mappings
-                self._apply_app_config(instance["app_id"], config, env)
+                self._apply_app_config(
+                    instance["app_id"],
+                    config,
+                    env,
+                    integration_settings,
+                    integrations,
+                    keycloak_clients,
+                )
 
                 service["environment"] = env
 
@@ -192,11 +249,22 @@ class ComposeGenerator:
                 for vol in app["default_config"]["volumes"]:
                     vol = vol.replace("{instance_name}", service_name)
                     volumes.append(vol)
+
+                # Add Keycloak import volume if configured
+                if instance["app_id"] == "keycloak" and keycloak_clients:
+                    volumes.append(
+                        f"./configs/{service_name}/import:/opt/keycloak/data/import:ro"
+                    )
+
                 service["volumes"] = volumes
 
             # Handle command
             if "command" in app.get("default_config", {}):
-                service["command"] = app["default_config"]["command"]
+                cmd = app["default_config"]["command"]
+                # Modify Keycloak command to include import flag
+                if instance["app_id"] == "keycloak" and keycloak_clients:
+                    cmd = "start-dev --import-realm"
+                service["command"] = cmd
 
             # Handle cap_add
             if "cap_add" in app.get("default_config", {}):
@@ -219,7 +287,7 @@ class ComposeGenerator:
 
         # Collect named volumes
         named_volumes = set()
-        for service_name, service in compose["services"].items():
+        for svc_name, service in compose["services"].items():
             if "volumes" in service:
                 for vol in service["volumes"]:
                     if ":" in vol:
@@ -233,28 +301,80 @@ class ComposeGenerator:
 
         # Generate integration config files
         self._generate_integration_configs(
-            instances, integration_results, integration_settings, config_files
+            instances, integration_results, integration_settings, config_files, keycloak_realm_config
         )
 
-        # Generate Prometheus configs for any Prometheus instances
+        # Generate Prometheus configs
         for instance in instances:
             if instance["app_id"] == "prometheus":
                 config_files[f"configs/{instance['instance_name']}/prometheus.yml"] = (
                     generate_prometheus_config()
                 )
 
+        # Generate database registration scripts if Ignition is present
+        db_readme_section = ""
+        if has_ignition and integration_settings.database.get("auto_register", True):
+            db_int = integrations.get("db_provider", {})
+            if db_int:
+                databases = []
+                for provider in db_int.get("providers", []):
+                    # Find the config for this provider
+                    provider_config = next(
+                        (i.get("config", {}) for i in instances if i["instance_name"] == provider["instance_name"]),
+                        {}
+                    )
+                    databases.append({
+                        "type": provider["service_id"],
+                        "instance_name": provider["instance_name"],
+                        "config": provider_config,
+                    })
+
+                if databases:
+                    # Find Ignition instance details
+                    ignition_instance = next(
+                        (i for i in instances if i["app_id"] == "ignition"),
+                        None
+                    )
+                    if ignition_instance:
+                        ignition_config = ignition_instance.get("config", {})
+                        config_files["scripts/register_databases.py"] = (
+                            generate_ignition_db_registration_script(
+                                ignition_host=ignition_instance["instance_name"],
+                                ignition_port=int(ignition_config.get("http_port", 8088)),
+                                admin_username=ignition_config.get("admin_username", "admin"),
+                                admin_password=ignition_config.get("admin_password", "password"),
+                                databases=databases,
+                            )
+                        )
+                        config_files["scripts/requirements.txt"] = generate_requirements_file()
+                        db_readme_section = generate_ignition_db_readme_section(databases)
+
+        # Generate Ignition startup scripts
+        startup_scripts = {}
+        if has_ignition:
+            startup_scripts = self._generate_ignition_startup_scripts(stack_name)
+
         # Convert to YAML
         compose_yaml = yaml.dump(compose, default_flow_style=False, sort_keys=False)
         env_content = "\n".join(env_vars)
 
         # Generate README
-        readme_content = self._generate_readme(instances, global_settings, catalog_dict)
+        keycloak_readme_section = ""
+        if keycloak_clients:
+            realm_name = integration_settings.oauth.get("realm_name", "iiot")
+            keycloak_readme_section = generate_keycloak_readme_section(realm_name, keycloak_clients)
+
+        readme_content = self._generate_readme(
+            instances, global_settings, catalog_dict,
+            db_readme_section, keycloak_readme_section, has_ignition
+        )
 
         return {
             "docker_compose": compose_yaml,
             "env": env_content,
             "readme": readme_content,
             "config_files": config_files,
+            "startup_scripts": startup_scripts,
             "integration_results": integration_results,
         }
 
@@ -283,13 +403,53 @@ class ComposeGenerator:
                 info.external_attr = 0o644 << 16
                 zip_file.writestr(info, content)
 
+            # Add startup scripts with executable permissions
+            for file_path, content in generated.get("startup_scripts", {}).items():
+                info = zipfile.ZipInfo(file_path)
+                info.external_attr = 0o755 << 16  # executable
+                zip_file.writestr(info, content)
+
             zip_file.writestr("configs/.gitkeep", "")
+            zip_file.writestr("scripts/.gitkeep", "")
 
         zip_buffer.seek(0)
         return zip_buffer.getvalue()
 
-    def _apply_app_config(self, app_id: str, config: dict, env: dict) -> None:
+    def _get_host_port(self, app_id: str, config: dict, port_mapping: str) -> str:
+        """Get host port for a service based on config and app type"""
+        container_port = port_mapping.split(":")[1]
+        default_port = port_mapping.split(":")[0]
+
+        if app_id == "ignition":
+            if container_port == "8088":
+                return str(config.get("http_port", default_port))
+            elif container_port == "8043":
+                return str(config.get("https_port", default_port))
+        elif app_id == "traefik":
+            if container_port == "80":
+                return str(config.get("http_port", 80))
+            elif container_port == "443":
+                return str(config.get("https_port", 443))
+            elif container_port == "8080":
+                return str(config.get("dashboard_port", 8080))
+        elif app_id == "keycloak":
+            return str(config.get("port", default_port))
+
+        return str(config.get("port", default_port))
+
+    def _apply_app_config(
+        self,
+        app_id: str,
+        config: dict,
+        env: dict,
+        integration_settings: IntegrationSettings,
+        integrations: dict,
+        keycloak_clients: list,
+    ) -> None:
         """Apply app-specific configuration mappings"""
+        has_oauth_provider = "oauth_provider" in integrations
+        has_email_testing = "email_testing" in integrations
+
         if app_id == "postgres":
             env["POSTGRES_DB"] = config.get("database", env.get("POSTGRES_DB"))
             env["POSTGRES_USER"] = config.get("username", env.get("POSTGRES_USER"))
@@ -301,28 +461,116 @@ class ComposeGenerator:
             env["MYSQL_PASSWORD"] = config.get("password", env.get("MYSQL_PASSWORD"))
             env["MYSQL_ROOT_PASSWORD"] = config.get("root_password", env.get("MYSQL_ROOT_PASSWORD"))
 
+        elif app_id == "mssql":
+            env["SA_PASSWORD"] = config.get("sa_password", env.get("SA_PASSWORD"))
+            env["MSSQL_PID"] = config.get("edition", env.get("MSSQL_PID"))
+
         elif app_id == "ignition":
             env["GATEWAY_ADMIN_USERNAME"] = config.get("admin_username", env.get("GATEWAY_ADMIN_USERNAME"))
             env["GATEWAY_ADMIN_PASSWORD"] = config.get("admin_password", env.get("GATEWAY_ADMIN_PASSWORD"))
             env["IGNITION_EDITION"] = config.get("edition", env.get("IGNITION_EDITION", "standard"))
 
-            modules = config.get("modules", [])
+            # Handle version-specific modules
+            version = config.get("version", "latest")
+            is_83_or_later = version == "latest" or version.startswith("8.3") or version.startswith("8.4")
+
+            if is_83_or_later:
+                modules = config.get("modules_83", config.get("modules", []))
+            else:
+                modules = config.get("modules_81", config.get("modules", []))
+
             if isinstance(modules, list) and len(modules) > 0:
                 module_values = []
                 for mod in modules:
                     if isinstance(mod, dict):
-                        module_values.append(mod.get("value", mod))
+                        module_values.append(mod.get("value", str(mod)))
                     else:
-                        module_values.append(mod)
+                        module_values.append(str(mod))
                 env["GATEWAY_MODULES_ENABLED"] = ",".join(module_values)
+
+            # Memory settings
+            env["IGNITION_MEMORY_MAX"] = config.get("memory_max", env.get("IGNITION_MEMORY_MAX", "2048m"))
+            env["IGNITION_MEMORY_INIT"] = config.get("memory_init", env.get("IGNITION_MEMORY_INIT", "512m"))
+
+            # Email integration
+            if has_email_testing and integration_settings.email.get("auto_configure_services", True):
+                email_int = integrations["email_testing"]
+                mailhog_instance = email_int.get("provider", "mailhog")
+                from_address = integration_settings.email.get("from_address", "noreply@iiot.local")
+                email_env_vars = generate_email_env_vars("ignition", mailhog_instance, from_address)
+                env.update(email_env_vars)
 
         elif app_id == "grafana":
             env["GF_SECURITY_ADMIN_USER"] = config.get("admin_username", env.get("GF_SECURITY_ADMIN_USER"))
             env["GF_SECURITY_ADMIN_PASSWORD"] = config.get("admin_password", env.get("GF_SECURITY_ADMIN_PASSWORD"))
 
+            # OAuth integration
+            if has_oauth_provider and integration_settings.oauth.get("auto_configure_services", True):
+                client_secret = self._get_keycloak_client_secret("grafana", keycloak_clients)
+                if client_secret:
+                    realm_name = integration_settings.oauth.get("realm_name", "iiot")
+                    oauth_env = generate_oauth_env_vars(
+                        "grafana", "keycloak", realm_name,
+                        client_secret=client_secret
+                    )
+                    env.update(oauth_env)
+
+            # Email integration
+            if has_email_testing and integration_settings.email.get("auto_configure_services", True):
+                email_int = integrations["email_testing"]
+                mailhog_instance = email_int.get("provider", "mailhog")
+                from_address = integration_settings.email.get("from_address", "noreply@iiot.local")
+                email_env_vars = generate_email_env_vars("grafana", mailhog_instance, from_address)
+                env.update(email_env_vars)
+
         elif app_id == "keycloak":
             env["KEYCLOAK_ADMIN"] = config.get("admin_username", env.get("KEYCLOAK_ADMIN"))
             env["KEYCLOAK_ADMIN_PASSWORD"] = config.get("admin_password", env.get("KEYCLOAK_ADMIN_PASSWORD"))
+
+            # Email integration
+            if has_email_testing and integration_settings.email.get("auto_configure_services", True):
+                email_int = integrations["email_testing"]
+                mailhog_instance = email_int.get("provider", "mailhog")
+                from_address = integration_settings.email.get("from_address", "noreply@iiot.local")
+                email_env_vars = generate_email_env_vars("keycloak", mailhog_instance, from_address)
+                env.update(email_env_vars)
+
+        elif app_id == "n8n":
+            env["N8N_BASIC_AUTH_USER"] = config.get("username", env.get("N8N_BASIC_AUTH_USER"))
+            env["N8N_BASIC_AUTH_PASSWORD"] = config.get("password", env.get("N8N_BASIC_AUTH_PASSWORD"))
+
+            # OAuth integration
+            if has_oauth_provider and integration_settings.oauth.get("auto_configure_services", True):
+                client_secret = self._get_keycloak_client_secret("n8n", keycloak_clients)
+                if client_secret:
+                    realm_name = integration_settings.oauth.get("realm_name", "iiot")
+                    oauth_env = generate_oauth_env_vars(
+                        "n8n", "keycloak", realm_name,
+                        client_secret=client_secret
+                    )
+                    env.update(oauth_env)
+
+            # Email integration
+            if has_email_testing and integration_settings.email.get("auto_configure_services", True):
+                email_int = integrations["email_testing"]
+                mailhog_instance = email_int.get("provider", "mailhog")
+                from_address = integration_settings.email.get("from_address", "noreply@iiot.local")
+                email_env_vars = generate_email_env_vars("n8n", mailhog_instance, from_address)
+                env.update(email_env_vars)
+
+        elif app_id == "vault":
+            env["VAULT_DEV_ROOT_TOKEN_ID"] = config.get("root_token", env.get("VAULT_DEV_ROOT_TOKEN_ID"))
+
+        elif app_id == "pgadmin":
+            env["PGADMIN_DEFAULT_EMAIL"] = config.get("email", env.get("PGADMIN_DEFAULT_EMAIL"))
+            env["PGADMIN_DEFAULT_PASSWORD"] = config.get("password", env.get("PGADMIN_DEFAULT_PASSWORD"))
+
+    def _get_keycloak_client_secret(self, client_id: str, keycloak_clients: list) -> str | None:
+        """Get client secret from Keycloak clients list"""
+        for client in keycloak_clients:
+            if client.get("clientId") == client_id:
+                return client.get("secret")
+        return None
 
     def _generate_traefik_labels(
         self, instance: dict, reverse_proxy_settings: dict
@@ -337,6 +585,7 @@ class ComposeGenerator:
             "prometheus": lambda c: "9090",
             "dozzle": lambda c: "8080",
             "portainer": lambda c: "9000",
+            "mailhog": lambda c: "8025",
         }
 
         app_id = instance["app_id"]
@@ -371,6 +620,7 @@ class ComposeGenerator:
         integration_results: dict,
         integration_settings: IntegrationSettings,
         config_files: dict[str, str],
+        keycloak_realm_config: dict | None,
     ) -> None:
         """Generate configuration files for integrations"""
         integrations = integration_results.get("integrations", {})
@@ -396,6 +646,12 @@ class ComposeGenerator:
                             tls_port=mqtt_tls_port,
                         )
                     )
+
+                    # Generate password file if credentials provided
+                    if mqtt_username and mqtt_password:
+                        config_files[f"configs/{instance_name}/passwd"] = (
+                            generate_mosquitto_password_file(mqtt_username, mqtt_password)
+                        )
 
         # Grafana Datasource Provisioning
         if "visualization" in integrations:
@@ -437,6 +693,7 @@ class ComposeGenerator:
                 "n8n": lambda c: int(c.get("port", 5678)),
                 "keycloak": lambda c: int(c.get("port", 8180)),
                 "prometheus": lambda c: 9090,
+                "mailhog": lambda c: 8025,
             }
 
             for instance in instances:
@@ -459,11 +716,60 @@ class ComposeGenerator:
                 enable_https=enable_https,
             )
 
+        # Keycloak Realm Configuration
+        if keycloak_realm_config:
+            realm_name = integration_settings.oauth.get("realm_name", "iiot")
+            realm_json = json.dumps(keycloak_realm_config, indent=2)
+            config_files[f"configs/keycloak/import/realm-{realm_name}.json"] = realm_json
+
+    def _generate_ignition_startup_scripts(self, stack_name: str) -> dict[str, str]:
+        """Generate startup scripts for Ignition stacks"""
+        start_sh = f'''#!/bin/bash
+# Ignition Stack Startup Script
+# Handles proper initialization of Ignition data volumes
+
+echo "Starting {stack_name}..."
+
+# Start all services
+docker compose up -d
+
+echo ""
+echo "Stack started successfully!"
+echo "Access Ignition Gateway at http://localhost:8088"
+echo ""
+echo "To view logs: docker compose logs -f"
+echo "To stop: docker compose down"
+'''
+
+        start_bat = f'''@echo off
+REM Ignition Stack Startup Script
+REM Handles proper initialization of Ignition data volumes
+
+echo Starting {stack_name}...
+
+docker compose up -d
+
+echo.
+echo Stack started successfully!
+echo Access Ignition Gateway at http://localhost:8088
+echo.
+echo To view logs: docker compose logs -f
+echo To stop: docker compose down
+'''
+
+        return {
+            "start.sh": start_sh,
+            "start.bat": start_bat,
+        }
+
     def _generate_readme(
         self,
         instances: list[dict],
         global_settings: GlobalSettings,
         catalog_dict: dict,
+        db_readme_section: str = "",
+        keycloak_readme_section: str = "",
+        has_ignition: bool = False,
     ) -> str:
         """Generate README documentation"""
         readme = f"""# {global_settings.stack_name} - Generated Configuration
@@ -479,7 +785,30 @@ class ComposeGenerator:
             version = instance.get("config", {}).get("version", "latest")
             readme += f"- {instance['instance_name']} ({instance['app_id']}) - {version}\n"
 
-        readme += """
+        # Startup instructions
+        if has_ignition:
+            readme += """
+## Getting Started
+
+1. Review the generated `docker-compose.yml` and `.env` files
+2. Customize any settings as needed
+3. Start the stack using the initialization script:
+
+   **Linux/Mac:**
+   ```bash
+   chmod +x start.sh
+   ./start.sh
+   ```
+
+   **Windows:**
+   ```cmd
+   start.bat
+   ```
+
+   The script automatically handles Ignition volume initialization on first run.
+"""
+        else:
+            readme += """
 ## Getting Started
 
 1. Review the generated `docker-compose.yml` and `.env` files
@@ -488,7 +817,9 @@ class ComposeGenerator:
    ```bash
    docker compose up -d
    ```
+"""
 
+        readme += """
 ## Service URLs
 """
         for instance in instances:
@@ -497,6 +828,14 @@ class ComposeGenerator:
                 config = instance.get("config", {})
                 port = config.get("port", config.get("http_port", 8080))
                 readme += f"- **{instance['instance_name']}**: http://localhost:{port}\n"
+
+        # Add Keycloak section if present
+        if keycloak_readme_section:
+            readme += keycloak_readme_section
+
+        # Add database registration section if present
+        if db_readme_section:
+            readme += db_readme_section
 
         readme += """
 ## Stopping the Stack
