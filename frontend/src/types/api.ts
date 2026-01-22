@@ -164,3 +164,35 @@ export type ParameterType =
   | 'credential'
   | 'list'
   | 'dict';
+
+// CloudDesigner types
+export interface DockerStatus {
+  installed: boolean;
+  running: boolean;
+  version?: string;
+}
+
+export interface CloudDesignerStatus {
+  status: 'running' | 'exited' | 'paused' | 'not_created' | 'unknown';
+  port?: number;
+  error?: string;
+}
+
+export interface CloudDesignerStartResponse {
+  success: boolean;
+  output?: string;
+  error?: string;
+}
+
+export interface CloudDesignerStopResponse {
+  success: boolean;
+  output?: string;
+  error?: string;
+}
+
+export interface CloudDesignerConfig {
+  compose_dir: string;
+  compose_dir_exists: boolean;
+  container_name: string;
+  default_port: number;
+}

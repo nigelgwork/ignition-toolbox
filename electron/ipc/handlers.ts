@@ -132,5 +132,20 @@ export function registerIpcHandlers(pythonBackend: PythonBackend): void {
     return getUpdateStatus();
   });
 
+  // CloudDesigner popup window
+  ipcMain.handle('clouddesigner:openWindow', async () => {
+    const designerWindow = new BrowserWindow({
+      width: 1920,
+      height: 1080,
+      title: 'Ignition Designer',
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    });
+    designerWindow.loadURL('http://localhost:8080');
+    return true;
+  });
+
   console.log('IPC handlers registered');
 }

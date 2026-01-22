@@ -9,6 +9,7 @@ import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout, type DomainTab } from './components/Layout';
 import { Playbooks } from './pages/Playbooks';
+import { Designer } from './pages/Designer';
 import { ExecutionDetail } from './pages/ExecutionDetail';
 import { Settings } from './pages/Settings';
 import { APIExplorer } from './pages/APIExplorer';
@@ -121,7 +122,7 @@ function AppContent() {
       case 'gateway':
         return <Playbooks domainFilter="gateway" />;
       case 'designer':
-        return <Playbooks domainFilter="designer" />;
+        return <Designer />;
       case 'perspective':
         return <Playbooks domainFilter="perspective" />;
       case 'api':

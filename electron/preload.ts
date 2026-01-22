@@ -74,6 +74,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installUpdate: (): Promise<{ success: boolean }> => ipcRenderer.invoke('updates:install'),
   getUpdateStatus: (): Promise<UpdateStatus> => ipcRenderer.invoke('updates:getStatus'),
 
+  // CloudDesigner
+  cloudDesigner: {
+    openWindow: (): Promise<boolean> => ipcRenderer.invoke('clouddesigner:openWindow'),
+  },
+
   // Event listeners (for backend status updates)
   on: (channel: ValidEventChannel, callback: (data: unknown) => void): (() => void) => {
     if (!validEventChannels.includes(channel)) {
@@ -130,6 +135,9 @@ declare global {
       getUpdateStatus: () => Promise<UpdateStatus>;
       on: (channel: ValidEventChannel, callback: (data: unknown) => void) => () => void;
       off: (channel: ValidEventChannel, callback: (data: unknown) => void) => void;
+      cloudDesigner: {
+        openWindow: () => Promise<boolean>;
+      };
     };
   }
 }

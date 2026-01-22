@@ -12,6 +12,11 @@ import type {
   CredentialInfo,
   CredentialCreate,
   HealthResponse,
+  DockerStatus,
+  CloudDesignerStatus,
+  CloudDesignerStartResponse,
+  CloudDesignerStopResponse,
+  CloudDesignerConfig,
 } from '../types/api';
 
 // API Base URL - supports both web and Electron modes
@@ -560,6 +565,34 @@ export const api = {
         `/api/stackbuilder/stacks/${id}`,
         { method: 'DELETE' }
       ),
+  },
+
+  /**
+   * CloudDesigner - Browser-based Ignition Designer
+   */
+  cloudDesigner: {
+    getDockerStatus: () =>
+      fetchJSON<DockerStatus>('/api/clouddesigner/docker-status'),
+
+    getStatus: () =>
+      fetchJSON<CloudDesignerStatus>('/api/clouddesigner/status'),
+
+    start: (gatewayUrl: string, credentialName?: string) =>
+      fetchJSON<CloudDesignerStartResponse>('/api/clouddesigner/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          gateway_url: gatewayUrl,
+          credential_name: credentialName,
+        }),
+      }),
+
+    stop: () =>
+      fetchJSON<CloudDesignerStopResponse>('/api/clouddesigner/stop', {
+        method: 'POST',
+      }),
+
+    getConfig: () =>
+      fetchJSON<CloudDesignerConfig>('/api/clouddesigner/config'),
   },
 
   /**
