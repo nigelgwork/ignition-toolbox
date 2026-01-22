@@ -23,13 +23,33 @@ _CREATION_FLAGS = (
 )
 
 
+def _is_wsl() -> bool:
+    """
+    Check if running inside Windows Subsystem for Linux (WSL).
+
+    Returns:
+        True if running in WSL, False otherwise
+    """
+    if platform.system() != "Linux":
+        return False
+
+    try:
+        with open("/proc/version", "r") as f:
+            version_info = f.read().lower()
+            return "microsoft" in version_info or "wsl" in version_info
+    except (FileNotFoundError, PermissionError):
+        return False
+
+
 def _find_docker_executable() -> str | None:
     """
     Find the Docker executable path.
 
-    On Windows with Docker Desktop (WSL2 backend), the docker.exe is typically in:
-    - C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe
-    - Or in PATH if Docker Desktop is properly configured
+    Checks in order:
+    1. Linux PATH first (works for WSL with Docker installed natively)
+    2. Linux standard paths: /usr/bin/docker, /usr/local/bin/docker
+    3. WSL Windows paths: /mnt/c/Program Files/Docker/...
+    4. Native Windows paths (for Windows host)
 
     Returns:
         Path to docker executable, or None if not found
@@ -38,6 +58,31 @@ def _find_docker_executable() -> str | None:
     docker_path = shutil.which("docker")
     if docker_path:
         return docker_path
+
+    # On Linux (including WSL), check standard Linux paths
+    if platform.system() == "Linux":
+        linux_paths = [
+            Path("/usr/bin/docker"),
+            Path("/usr/local/bin/docker"),
+            Path("/snap/bin/docker"),
+        ]
+
+        for path in linux_paths:
+            if path.exists():
+                logger.info(f"Found Docker at: {path}")
+                return str(path)
+
+        # If running in WSL, also check Windows Docker Desktop paths via /mnt/c
+        if _is_wsl():
+            wsl_windows_paths = [
+                Path("/mnt/c/Program Files/Docker/Docker/resources/bin/docker.exe"),
+                Path("/mnt/c/Program Files/Docker/Docker/resources/bin/docker"),
+            ]
+
+            for path in wsl_windows_paths:
+                if path.exists():
+                    logger.info(f"Found Docker (WSL Windows) at: {path}")
+                    return str(path)
 
     # On Windows, check common Docker Desktop installation paths
     if platform.system() == "Windows":

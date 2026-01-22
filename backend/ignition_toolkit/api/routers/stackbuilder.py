@@ -18,6 +18,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from ignition_toolkit.stackbuilder.catalog import get_service_catalog
+from ignition_toolkit.stackbuilder.stack_runner import get_stack_runner
 
 # Validation patterns for Docker-compatible names
 # Must start with alphanumeric, can contain letters, numbers, underscores, periods, hyphens
@@ -900,4 +901,184 @@ This bundle contains everything needed for airgapped/offline deployment.
 
     except Exception as e:
         logger.error(f"Error generating offline bundle: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Stack Deployment Routes (Local Docker)
+# ============================================================================
+
+
+class DeployStackRequest(BaseModel):
+    """Request to deploy a stack to local Docker"""
+
+    stack_name: str = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        pattern=VALID_NAME_PATTERN,
+        description="Docker-compatible stack name",
+    )
+    stack_config: StackConfig
+
+    @field_validator("stack_name")
+    @classmethod
+    def validate_stack_name(cls, v: str) -> str:
+        """Validate stack name is not reserved"""
+        if v.lower() in RESERVED_NAMES:
+            raise ValueError(f"Stack name '{v}' is reserved")
+        return v
+
+
+class DeploymentStatus(BaseModel):
+    """Status of a deployed stack"""
+
+    status: str  # running, partial, stopped, not_deployed, unknown
+    services: dict[str, str]  # service_name -> status
+    error: str | None = None
+
+
+class DeploymentResult(BaseModel):
+    """Result of a deployment operation"""
+
+    success: bool
+    output: str | None = None
+    error: str | None = None
+
+
+@router.get("/docker-status")
+async def get_docker_status():
+    """Check if Docker is available and running"""
+    try:
+        runner = get_stack_runner()
+        available = runner.check_docker_available()
+        return {
+            "available": available,
+            "message": "Docker is ready" if available else "Docker is not available",
+        }
+    except Exception as e:
+        logger.error(f"Error checking Docker status: {e}")
+        return {
+            "available": False,
+            "message": str(e),
+        }
+
+
+@router.post("/deploy", response_model=DeploymentResult)
+async def deploy_stack(request: DeployStackRequest):
+    """
+    Deploy a stack to local Docker.
+
+    Generates the docker-compose files and runs docker compose up.
+    """
+    try:
+        # Generate the compose files
+        instances, global_settings, integration_settings = _convert_stack_config(
+            request.stack_config
+        )
+        generator = ComposeGenerator()
+        result = generator.generate(instances, global_settings, integration_settings)
+
+        # Deploy using the stack runner
+        runner = get_stack_runner()
+        deploy_result = runner.deploy_stack(
+            stack_name=request.stack_name,
+            compose_content=result["docker_compose"],
+            env_content=result["env"],
+            config_files=result.get("config_files", {}),
+        )
+
+        return DeploymentResult(
+            success=deploy_result.success,
+            output=deploy_result.output,
+            error=deploy_result.error,
+        )
+
+    except Exception as e:
+        logger.error(f"Error deploying stack: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/stop/{stack_name}", response_model=DeploymentResult)
+async def stop_stack(stack_name: str, remove_volumes: bool = False):
+    """
+    Stop a running stack.
+
+    Args:
+        stack_name: Name of the stack to stop
+        remove_volumes: If true, also remove Docker volumes
+    """
+    try:
+        runner = get_stack_runner()
+        result = runner.stop_stack(stack_name, remove_volumes=remove_volumes)
+
+        return DeploymentResult(
+            success=result.success,
+            output=result.output,
+            error=result.error,
+        )
+
+    except Exception as e:
+        logger.error(f"Error stopping stack: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/deployment-status/{stack_name}", response_model=DeploymentStatus)
+async def get_deployment_status(stack_name: str):
+    """Get the status of a deployed stack"""
+    try:
+        runner = get_stack_runner()
+        status = runner.get_stack_status(stack_name)
+
+        return DeploymentStatus(
+            status=status.status,
+            services=status.services,
+            error=status.error,
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting deployment status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/deployments")
+async def list_deployments():
+    """List all deployed stacks"""
+    try:
+        runner = get_stack_runner()
+        stacks = runner.list_deployed_stacks()
+
+        # Get status for each stack
+        deployments = []
+        for stack_name in stacks:
+            status = runner.get_stack_status(stack_name)
+            deployments.append({
+                "name": stack_name,
+                "status": status.status,
+                "services": status.services,
+            })
+
+        return {"deployments": deployments}
+
+    except Exception as e:
+        logger.error(f"Error listing deployments: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/deployment/{stack_name}")
+async def delete_deployment(stack_name: str):
+    """Delete a deployed stack (stops and removes files)"""
+    try:
+        runner = get_stack_runner()
+        result = runner.delete_stack(stack_name)
+
+        if result.success:
+            return {"message": f"Stack '{stack_name}' deleted successfully"}
+        else:
+            raise HTTPException(status_code=500, detail=result.error)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting deployment: {e}")
         raise HTTPException(status_code=500, detail=str(e))

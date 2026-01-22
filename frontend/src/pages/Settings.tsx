@@ -21,6 +21,9 @@ import {
   Stack,
   Switch,
   FormControlLabel,
+  RadioGroup,
+  Radio,
+  FormControl,
 } from '@mui/material';
 import {
   Key as CredentialsIcon,
@@ -35,6 +38,9 @@ import {
   Palette as AppearanceIcon,
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
+  ViewCompact as CompactIcon,
+  ViewComfy as ComfortableIcon,
+  ViewModule as SpaciousIcon,
 } from '@mui/icons-material';
 import { Credentials } from './Credentials';
 import { Executions } from './Executions';
@@ -84,6 +90,8 @@ export function Settings() {
   });
   const theme = useStore((state) => state.theme);
   const setTheme = useStore((state) => state.setTheme);
+  const density = useStore((state) => state.density);
+  const setDensity = useStore((state) => state.setDensity);
 
   // Get app version and health on mount
   useEffect(() => {
@@ -483,49 +491,128 @@ export function Settings() {
         Appearance
       </Typography>
 
-      <Paper
-        sx={{
-          p: 3,
-          bgcolor: 'background.paper',
-          border: '1px solid',
-          borderColor: 'divider',
-        }}
-      >
-        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
-          Theme
-        </Typography>
-        <Divider sx={{ mb: 3 }} />
+      <Stack spacing={3}>
+        {/* Theme Section */}
+        <Paper
+          sx={{
+            p: 3,
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
+            Theme
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
 
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {theme === 'dark' ? (
-              <DarkModeIcon sx={{ color: 'primary.main' }} />
-            ) : (
-              <LightModeIcon sx={{ color: 'warning.main' }} />
-            )}
-            <Box>
-              <Typography variant="body1" fontWeight="medium">
-                {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {theme === 'dark'
-                  ? 'Using dark theme with navy blue background'
-                  : 'Using light theme with white background'}
-              </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {theme === 'dark' ? (
+                <DarkModeIcon sx={{ color: 'primary.main' }} />
+              ) : (
+                <LightModeIcon sx={{ color: 'warning.main' }} />
+              )}
+              <Box>
+                <Typography variant="body1" fontWeight="medium">
+                  {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {theme === 'dark'
+                    ? 'Using dark theme with navy blue background'
+                    : 'Using light theme with white background'}
+                </Typography>
+              </Box>
             </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={theme === 'dark'}
+                  onChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                  color="primary"
+                />
+              }
+              label=""
+            />
           </Box>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={theme === 'dark'}
-                onChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                color="primary"
+        </Paper>
+
+        {/* Density Section */}
+        <Paper
+          sx={{
+            p: 3,
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
+            Display Density
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+
+          <FormControl component="fieldset">
+            <RadioGroup
+              value={density}
+              onChange={(e) => setDensity(e.target.value as 'compact' | 'comfortable' | 'spacious')}
+            >
+              <FormControlLabel
+                value="compact"
+                control={<Radio size="small" />}
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <CompactIcon sx={{ color: density === 'compact' ? 'primary.main' : 'text.secondary' }} />
+                    <Box>
+                      <Typography variant="body2" fontWeight={density === 'compact' ? 'medium' : 'normal'}>
+                        Compact
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Less spacing, more content visible
+                      </Typography>
+                    </Box>
+                  </Box>
+                }
+                sx={{ mb: 1.5 }}
               />
-            }
-            label=""
-          />
-        </Box>
-      </Paper>
+              <FormControlLabel
+                value="comfortable"
+                control={<Radio size="small" />}
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <ComfortableIcon sx={{ color: density === 'comfortable' ? 'primary.main' : 'text.secondary' }} />
+                    <Box>
+                      <Typography variant="body2" fontWeight={density === 'comfortable' ? 'medium' : 'normal'}>
+                        Comfortable
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Balanced spacing (default)
+                      </Typography>
+                    </Box>
+                  </Box>
+                }
+                sx={{ mb: 1.5 }}
+              />
+              <FormControlLabel
+                value="spacious"
+                control={<Radio size="small" />}
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <SpaciousIcon sx={{ color: density === 'spacious' ? 'primary.main' : 'text.secondary' }} />
+                    <Box>
+                      <Typography variant="body2" fontWeight={density === 'spacious' ? 'medium' : 'normal'}>
+                        Spacious
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        More breathing room between elements
+                      </Typography>
+                    </Box>
+                  </Box>
+                }
+              />
+            </RadioGroup>
+          </FormControl>
+        </Paper>
+      </Stack>
     </Box>
   );
 

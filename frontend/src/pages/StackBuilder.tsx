@@ -53,6 +53,9 @@ import {
   ExpandMore as ExpandMoreIcon,
   CloudDownload as CloudDownloadIcon,
   FlightTakeoff as OfflineIcon,
+  PlayArrow as DeployIcon,
+  Stop as StopIcon,
+  Circle as StatusIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -511,6 +514,12 @@ export function StackBuilder() {
   const [stackName, setStackName] = useState('');
   const [stackDescription, setStackDescription] = useState('');
 
+  // Deployment state
+  const [deploymentStatus, setDeploymentStatus] = useState<{
+    status: string;
+    services: Record<string, string>;
+  } | null>(null);
+
   // Fetch catalog
   const { data: catalog, isLoading: catalogLoading } = useQuery({
     queryKey: ['stackbuilder-catalog'],
@@ -621,6 +630,50 @@ export function StackBuilder() {
     },
   });
 
+  // Docker status check
+  const { data: dockerStatus } = useQuery({
+    queryKey: ['docker-status'],
+    queryFn: () => api.stackBuilder.getDockerStatus(),
+    refetchInterval: 30000, // Check every 30 seconds
+  });
+
+  // Deployment status check
+  const { refetch: refetchDeploymentStatus } = useQuery({
+    queryKey: ['deployment-status', globalSettings.stack_name],
+    queryFn: async () => {
+      const status = await api.stackBuilder.getDeploymentStatus(globalSettings.stack_name);
+      setDeploymentStatus(status);
+      return status;
+    },
+    enabled: !!globalSettings.stack_name,
+    refetchInterval: 5000, // Check every 5 seconds when deployed
+  });
+
+  // Deploy stack mutation
+  const deployMutation = useMutation({
+    mutationFn: () =>
+      api.stackBuilder.deploy(globalSettings.stack_name, {
+        instances: instances.map((i) => ({
+          app_id: i.app_id,
+          instance_name: i.instance_name,
+          config: i.config,
+        })),
+        global_settings: globalSettings,
+        integration_settings: integrationSettings,
+      }),
+    onSuccess: () => {
+      refetchDeploymentStatus();
+    },
+  });
+
+  // Stop stack mutation
+  const stopMutation = useMutation({
+    mutationFn: () => api.stackBuilder.stop(globalSettings.stack_name, false),
+    onSuccess: () => {
+      refetchDeploymentStatus();
+    },
+  });
+
   const applications = catalog?.applications?.filter((a: ServiceApplication) => a.enabled) || [];
   const categories = Array.from(new Set(applications.map((a: ServiceApplication) => a.category))) as string[];
 
@@ -675,13 +728,34 @@ export function StackBuilder() {
   return (
     <Box sx={{ display: 'flex', gap: 2, height: 'calc(100vh - 100px)' }}>
       {/* Left Panel: Service Catalog & Config */}
-      <Paper sx={{ width: 380, overflow: 'auto' }}>
-        <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+      <Paper sx={{ width: 380, overflow: 'auto', display: 'flex' }}>
+        {/* Vertical Tab Navigation */}
+        <Tabs
+          value={tabValue}
+          onChange={(_, v) => setTabValue(v)}
+          orientation="vertical"
+          sx={{
+            borderRight: 1,
+            borderColor: 'divider',
+            minWidth: 100,
+            '& .MuiTab-root': {
+              minHeight: 48,
+              py: 1.5,
+              px: 1,
+              fontSize: '0.75rem',
+              textTransform: 'none',
+              alignItems: 'flex-start',
+              textAlign: 'left',
+            },
+          }}
+        >
           <Tab label="Services" />
           <Tab label="Settings" />
           <Tab label="Integrations" />
           <Tab label="Preview" />
         </Tabs>
+        {/* Tab Content */}
+        <Box sx={{ flex: 1, overflow: 'auto' }}>
 
         {/* Services Tab */}
         <TabPanel value={tabValue} index={0}>
@@ -1023,6 +1097,7 @@ export function StackBuilder() {
             </Typography>
           )}
         </TabPanel>
+        </Box>
       </Paper>
 
       {/* Right Panel: Stack Configuration */}
@@ -1030,9 +1105,35 @@ export function StackBuilder() {
         {/* Actions Bar */}
         <Paper sx={{ p: 2, mb: 2 }}>
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-            <Typography variant="h6" sx={{ flex: 1 }}>
-              Stack: {globalSettings.stack_name}
-            </Typography>
+            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h6">
+                Stack: {globalSettings.stack_name}
+              </Typography>
+              {deploymentStatus && deploymentStatus.status !== 'not_deployed' && (
+                <Chip
+                  icon={<StatusIcon sx={{ fontSize: '0.75rem !important' }} />}
+                  label={deploymentStatus.status}
+                  size="small"
+                  color={
+                    deploymentStatus.status === 'running'
+                      ? 'success'
+                      : deploymentStatus.status === 'partial'
+                      ? 'warning'
+                      : 'default'
+                  }
+                  sx={{
+                    '& .MuiChip-icon': {
+                      color:
+                        deploymentStatus.status === 'running'
+                          ? 'success.main'
+                          : deploymentStatus.status === 'partial'
+                          ? 'warning.main'
+                          : 'text.secondary',
+                    },
+                  }}
+                />
+              )}
+            </Box>
             <Button
               variant="outlined"
               startIcon={<LoadIcon />}
@@ -1077,7 +1178,54 @@ export function StackBuilder() {
             >
               Download
             </Button>
+            {/* Deploy/Stop buttons */}
+            {deploymentStatus?.status === 'running' || deploymentStatus?.status === 'partial' ? (
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={stopMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <StopIcon />}
+                onClick={() => stopMutation.mutate()}
+                size="small"
+                disabled={stopMutation.isPending}
+              >
+                Stop
+              </Button>
+            ) : (
+              <Tooltip
+                title={
+                  !dockerStatus?.available
+                    ? 'Docker is not available. Please start Docker first.'
+                    : instances.length === 0
+                    ? 'Add services to deploy'
+                    : 'Deploy stack to local Docker'
+                }
+              >
+                <span>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    startIcon={deployMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <DeployIcon />}
+                    onClick={() => deployMutation.mutate()}
+                    size="small"
+                    disabled={instances.length === 0 || !dockerStatus?.available || deployMutation.isPending}
+                  >
+                    Deploy
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
           </Box>
+          {/* Deployment error/success messages */}
+          {deployMutation.isError && (
+            <Alert severity="error" sx={{ mt: 1 }}>
+              Deploy failed: {(deployMutation.error as Error)?.message || 'Unknown error'}
+            </Alert>
+          )}
+          {stopMutation.isError && (
+            <Alert severity="error" sx={{ mt: 1 }}>
+              Stop failed: {(stopMutation.error as Error)?.message || 'Unknown error'}
+            </Alert>
+          )}
         </Paper>
 
         {/* Selected Services */}

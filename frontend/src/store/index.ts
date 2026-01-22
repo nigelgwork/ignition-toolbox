@@ -11,6 +11,13 @@ const getInitialTheme = (): 'dark' | 'light' => {
   return (stored === 'light' || stored === 'dark') ? stored : 'dark';
 };
 
+// Initialize density from localStorage or default to 'comfortable'
+export type Density = 'compact' | 'comfortable' | 'spacious';
+const getInitialDensity = (): Density => {
+  const stored = localStorage.getItem('density');
+  return (stored === 'compact' || stored === 'comfortable' || stored === 'spacious') ? stored : 'comfortable';
+};
+
 interface ScreenshotFrame {
   executionId: string;
   screenshot: string; // base64 encoded JPEG
@@ -52,6 +59,10 @@ interface AppState {
   // Theme mode
   theme: 'dark' | 'light';
   setTheme: (theme: 'dark' | 'light') => void;
+
+  // Display density
+  density: Density;
+  setDensity: (density: Density) => void;
 
   // Global credential name (for header dropdown)
   globalCredential: string | null;
@@ -101,6 +112,12 @@ export const useStore = create<AppState>((set) => ({
   setTheme: (theme) => {
     localStorage.setItem('theme', theme);
     set({ theme });
+  },
+
+  density: getInitialDensity(),
+  setDensity: (density) => {
+    localStorage.setItem('density', density);
+    set({ density });
   },
 
   globalCredential: null,

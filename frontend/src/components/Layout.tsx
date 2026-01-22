@@ -12,6 +12,8 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  Tooltip,
+  IconButton,
 } from '@mui/material';
 import {
   Storage as GatewayIcon,
@@ -39,13 +41,13 @@ const isElectron = (): boolean => {
 // Domain tabs for playbook filtering
 export type DomainTab = 'gateway' | 'designer' | 'perspective' | 'api' | 'stackbuilder' | 'settings';
 
-const domainTabs: { id: DomainTab; label: string; icon: React.ReactNode }[] = [
+const domainTabs: { id: DomainTab; label: string; icon: React.ReactNode; iconOnly?: boolean }[] = [
   { id: 'gateway', label: 'Gateway', icon: <GatewayIcon fontSize="small" /> },
   { id: 'designer', label: 'Designer', icon: <DesignerIcon fontSize="small" /> },
   { id: 'perspective', label: 'Perspective', icon: <PerspectiveIcon fontSize="small" /> },
   { id: 'api', label: 'API', icon: <ApiIcon fontSize="small" /> },
   { id: 'stackbuilder', label: 'Stacks', icon: <StackIcon fontSize="small" /> },
-  { id: 'settings', label: 'Settings', icon: <SettingsIcon fontSize="small" /> },
+  { id: 'settings', label: 'Settings', icon: <SettingsIcon fontSize="small" />, iconOnly: true },
 ];
 
 interface LayoutProps {
@@ -148,28 +150,49 @@ export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
           {/* Tab Navigation */}
           <Box component="nav" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             {domainTabs.map((tab) => (
-              <Button
-                key={tab.id}
-                onClick={() => onTabChange(tab.id)}
-                startIcon={tab.icon}
-                size="small"
-                sx={{
-                  px: 1.5,
-                  py: 0.75,
-                  borderRadius: 1,
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  fontSize: '0.875rem',
-                  color: activeTab === tab.id ? 'primary.main' : 'text.secondary',
-                  bgcolor: activeTab === tab.id ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-                  '&:hover': {
-                    bgcolor: activeTab === tab.id ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                    color: activeTab === tab.id ? 'primary.main' : 'text.primary',
-                  },
-                }}
-              >
-                {tab.label}
-              </Button>
+              tab.iconOnly ? (
+                <Tooltip key={tab.id} title={tab.label} arrow>
+                  <IconButton
+                    onClick={() => onTabChange(tab.id)}
+                    size="small"
+                    sx={{
+                      p: 1,
+                      borderRadius: 1,
+                      color: activeTab === tab.id ? 'primary.main' : 'text.secondary',
+                      bgcolor: activeTab === tab.id ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                      '&:hover': {
+                        bgcolor: activeTab === tab.id ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                        color: activeTab === tab.id ? 'primary.main' : 'text.primary',
+                      },
+                    }}
+                  >
+                    {tab.icon}
+                  </IconButton>
+                </Tooltip>
+              ) : (
+                <Button
+                  key={tab.id}
+                  onClick={() => onTabChange(tab.id)}
+                  startIcon={tab.icon}
+                  size="small"
+                  sx={{
+                    px: 1.5,
+                    py: 0.75,
+                    borderRadius: 1,
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: '0.875rem',
+                    color: activeTab === tab.id ? 'primary.main' : 'text.secondary',
+                    bgcolor: activeTab === tab.id ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                    '&:hover': {
+                      bgcolor: activeTab === tab.id ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                      color: activeTab === tab.id ? 'primary.main' : 'text.primary',
+                    },
+                  }}
+                >
+                  {tab.label}
+                </Button>
+              )
             ))}
           </Box>
         </Box>
@@ -235,22 +258,44 @@ export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
           {updateStatus.available && (
             <Button
               onClick={() => onTabChange('settings')}
-              startIcon={<UpdateIcon />}
+              startIcon={
+                <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <UpdateIcon />
+                  {!updateStatus.downloaded && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: -2,
+                        right: -2,
+                        width: 8,
+                        height: 8,
+                        bgcolor: '#ef4444',
+                        borderRadius: '50%',
+                        animation: 'pulse 2s ease-in-out infinite',
+                        '@keyframes pulse': {
+                          '0%, 100%': { opacity: 1, transform: 'scale(1)' },
+                          '50%': { opacity: 0.6, transform: 'scale(1.2)' },
+                        },
+                      }}
+                    />
+                  )}
+                </Box>
+              }
               size="small"
               sx={{
-                bgcolor: 'warning.main',
-                color: 'warning.contrastText',
+                bgcolor: updateStatus.downloaded ? 'success.main' : '#f59e0b',
+                color: 'white',
                 textTransform: 'none',
                 fontWeight: 500,
                 fontSize: '0.75rem',
                 px: 1.5,
                 py: 0.5,
                 '&:hover': {
-                  bgcolor: 'warning.dark',
+                  bgcolor: updateStatus.downloaded ? 'success.dark' : '#d97706',
                 },
               }}
             >
-              {updateStatus.downloaded ? 'Update Ready' : 'Update Available'}
+              {updateStatus.downloaded ? 'Install & Restart' : 'Update Available'}
             </Button>
           )}
 

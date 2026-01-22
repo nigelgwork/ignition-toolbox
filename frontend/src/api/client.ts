@@ -565,6 +565,53 @@ export const api = {
         `/api/stackbuilder/stacks/${id}`,
         { method: 'DELETE' }
       ),
+
+    // Stack Deployment (Local Docker)
+    getDockerStatus: () =>
+      fetchJSON<{ available: boolean; message: string }>('/api/stackbuilder/docker-status'),
+
+    deploy: (stackName: string, config: {
+      instances: Array<{
+        app_id: string;
+        instance_name: string;
+        config: Record<string, unknown>;
+      }>;
+      global_settings?: {
+        stack_name?: string;
+        timezone?: string;
+        restart_policy?: string;
+      };
+      integration_settings?: Record<string, any>;
+    }) =>
+      fetchJSON<{ success: boolean; output?: string; error?: string }>('/api/stackbuilder/deploy', {
+        method: 'POST',
+        body: JSON.stringify({
+          stack_name: stackName,
+          stack_config: config,
+        }),
+      }),
+
+    stop: (stackName: string, removeVolumes: boolean = false) =>
+      fetchJSON<{ success: boolean; output?: string; error?: string }>(
+        `/api/stackbuilder/stop/${encodeURIComponent(stackName)}?remove_volumes=${removeVolumes}`,
+        { method: 'POST' }
+      ),
+
+    getDeploymentStatus: (stackName: string) =>
+      fetchJSON<{ status: string; services: Record<string, string>; error?: string }>(
+        `/api/stackbuilder/deployment-status/${encodeURIComponent(stackName)}`
+      ),
+
+    listDeployments: () =>
+      fetchJSON<{ deployments: Array<{ name: string; status: string; services: Record<string, string> }> }>(
+        '/api/stackbuilder/deployments'
+      ),
+
+    deleteDeployment: (stackName: string) =>
+      fetchJSON<{ message: string }>(
+        `/api/stackbuilder/deployment/${encodeURIComponent(stackName)}`,
+        { method: 'DELETE' }
+      ),
   },
 
   /**
