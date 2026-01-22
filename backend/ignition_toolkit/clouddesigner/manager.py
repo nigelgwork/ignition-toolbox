@@ -6,12 +6,29 @@ Manages the Docker Compose stack for browser-accessible Ignition Designer.
 
 import logging
 import os
+import sys
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 logger = logging.getLogger(__name__)
+
+
+def _get_docker_files_path() -> Path:
+    """
+    Get the path to the Docker files directory.
+
+    Handles both development mode (source files) and bundled mode (PyInstaller).
+    """
+    # Check if running from PyInstaller bundle
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        # Running from PyInstaller bundle
+        base_path = Path(sys._MEIPASS)
+        return base_path / "clouddesigner" / "docker_files"
+    else:
+        # Running from source
+        return Path(__file__).parent / "docker_files"
 
 ContainerStatus = Literal["running", "exited", "paused", "not_created", "unknown"]
 
@@ -49,7 +66,7 @@ class CloudDesignerManager:
     DEFAULT_PORT = 8080
 
     def __init__(self):
-        self.compose_dir = Path(__file__).parent / "docker_files"
+        self.compose_dir = _get_docker_files_path()
 
     def check_docker_installed(self) -> bool:
         """Check if docker command is available."""
