@@ -32,6 +32,7 @@ class DockerStatusResponse(BaseModel):
     installed: bool
     running: bool
     version: str | None = None
+    docker_path: str | None = None
 
 
 class CloudDesignerStatusResponse(BaseModel):
@@ -97,6 +98,7 @@ async def get_docker_status():
             installed=status.installed,
             running=status.running,
             version=status.version,
+            docker_path=status.docker_path,
         )
     except Exception as e:
         logger.exception("Error checking Docker status")

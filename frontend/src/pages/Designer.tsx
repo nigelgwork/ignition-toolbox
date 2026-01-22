@@ -158,11 +158,15 @@ export function Designer() {
         {dockerStatus && !dockerStatus.installed && (
           <Alert severity="warning" icon={<ErrorIcon />}>
             <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              Docker is not installed
+              Docker is not installed or not detected
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Install Docker Desktop to use the browser-based Designer.
               Visit <a href="https://www.docker.com/products/docker-desktop" target="_blank" rel="noopener noreferrer">docker.com</a> to download.
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              If Docker Desktop is already installed, make sure it's running and that the Docker CLI is accessible from your system PATH.
+              {dockerStatus.docker_path && ` (Detected: ${dockerStatus.docker_path})`}
             </Typography>
           </Alert>
         )}
@@ -243,6 +247,7 @@ export function Designer() {
             {dockerStatus.version && (
               <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
                 {dockerStatus.version}
+                {dockerStatus.docker_path && ` (${dockerStatus.docker_path})`}
               </Typography>
             )}
           </Box>

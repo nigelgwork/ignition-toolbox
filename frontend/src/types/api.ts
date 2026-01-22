@@ -170,6 +170,7 @@ export interface DockerStatus {
   installed: boolean;
   running: boolean;
   version?: string;
+  docker_path?: string;
 }
 
 export interface CloudDesignerStatus {

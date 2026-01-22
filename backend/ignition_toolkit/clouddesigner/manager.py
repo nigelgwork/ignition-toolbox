@@ -6,6 +6,8 @@ Manages the Docker Compose stack for browser-accessible Ignition Designer.
 
 import logging
 import os
+import platform
+import shutil
 import sys
 import subprocess
 from dataclasses import dataclass
@@ -13,6 +15,72 @@ from pathlib import Path
 from typing import Literal
 
 logger = logging.getLogger(__name__)
+
+# Windows-specific subprocess flag to hide console window
+# On non-Windows platforms, use 0 (no flags)
+_CREATION_FLAGS = (
+    subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+)
+
+
+def _find_docker_executable() -> str | None:
+    """
+    Find the Docker executable path.
+
+    On Windows with Docker Desktop (WSL2 backend), the docker.exe is typically in:
+    - C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe
+    - Or in PATH if Docker Desktop is properly configured
+
+    Returns:
+        Path to docker executable, or None if not found
+    """
+    # First, try to find docker in PATH
+    docker_path = shutil.which("docker")
+    if docker_path:
+        return docker_path
+
+    # On Windows, check common Docker Desktop installation paths
+    if platform.system() == "Windows":
+        common_paths = [
+            Path(os.environ.get("ProgramFiles", "C:\\Program Files"))
+            / "Docker"
+            / "Docker"
+            / "resources"
+            / "bin"
+            / "docker.exe",
+            Path(os.environ.get("LOCALAPPDATA", ""))
+            / "Docker"
+            / "wsl"
+            / "docker.exe",
+            Path(os.environ.get("ProgramW6432", "C:\\Program Files"))
+            / "Docker"
+            / "Docker"
+            / "resources"
+            / "bin"
+            / "docker.exe",
+        ]
+
+        for path in common_paths:
+            if path.exists():
+                logger.info(f"Found Docker at: {path}")
+                return str(path)
+
+    return None
+
+
+def _get_docker_command() -> list[str]:
+    """
+    Get the Docker command with proper path handling.
+
+    Returns:
+        List containing the docker command (may include full path on Windows)
+    """
+    docker_path = _find_docker_executable()
+    if docker_path:
+        return [docker_path]
+
+    # Fall back to just "docker" and let subprocess handle it
+    return ["docker"]
 
 
 def _get_docker_files_path() -> Path:
@@ -40,6 +108,7 @@ class DockerStatus:
     installed: bool
     running: bool
     version: str | None = None
+    docker_path: str | None = None
 
 
 @dataclass
@@ -71,45 +140,55 @@ class CloudDesignerManager:
     def check_docker_installed(self) -> bool:
         """Check if docker command is available."""
         try:
+            docker_cmd = _get_docker_command()
             result = subprocess.run(
-                ["docker", "--version"],
+                docker_cmd + ["--version"],
                 capture_output=True,
-                timeout=5,
+                timeout=10,  # Increased timeout for WSL startup
+                creationflags=_CREATION_FLAGS,
             )
             return result.returncode == 0
-        except (FileNotFoundError, subprocess.TimeoutExpired):
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
+            logger.debug(f"Docker not found: {e}")
             return False
 
     def check_docker_running(self) -> bool:
         """Check if Docker daemon is running."""
         try:
+            docker_cmd = _get_docker_command()
             result = subprocess.run(
-                ["docker", "info"],
+                docker_cmd + ["info"],
                 capture_output=True,
-                timeout=10,
+                timeout=30,  # Increased timeout for WSL2 startup
+                creationflags=_CREATION_FLAGS,
             )
             return result.returncode == 0
-        except (FileNotFoundError, subprocess.TimeoutExpired):
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
+            logger.debug(f"Docker daemon not running: {e}")
             return False
 
     def get_docker_version(self) -> str | None:
         """Get Docker version string."""
         try:
+            docker_cmd = _get_docker_command()
             result = subprocess.run(
-                ["docker", "--version"],
+                docker_cmd + ["--version"],
                 capture_output=True,
                 text=True,
-                timeout=5,
+                timeout=10,
+                creationflags=_CREATION_FLAGS,
             )
             if result.returncode == 0:
                 # Parse "Docker version 24.0.7, build afdd53b"
                 return result.stdout.strip()
             return None
-        except (FileNotFoundError, subprocess.TimeoutExpired):
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
+            logger.debug(f"Could not get Docker version: {e}")
             return None
 
     def get_docker_status(self) -> DockerStatus:
         """Get comprehensive Docker status."""
+        docker_path = _find_docker_executable()
         installed = self.check_docker_installed()
         running = self.check_docker_running() if installed else False
         version = self.get_docker_version() if installed else None
@@ -118,14 +197,16 @@ class CloudDesignerManager:
             installed=installed,
             running=running,
             version=version,
+            docker_path=docker_path,
         )
 
     def get_container_status(self) -> CloudDesignerStatus:
         """Check clouddesigner-desktop container status."""
         try:
+            docker_cmd = _get_docker_command()
             result = subprocess.run(
-                [
-                    "docker",
+                docker_cmd
+                + [
                     "inspect",
                     "-f",
                     "{{.State.Status}}",
@@ -133,7 +214,8 @@ class CloudDesignerManager:
                 ],
                 capture_output=True,
                 text=True,
-                timeout=10,
+                timeout=15,
+                creationflags=_CREATION_FLAGS,
             )
 
             if result.returncode != 0:
@@ -193,14 +275,16 @@ class CloudDesignerManager:
 
         try:
             logger.info(f"Starting CloudDesigner stack with gateway: {gateway_url}")
+            docker_cmd = _get_docker_command()
 
             result = subprocess.run(
-                ["docker", "compose", "up", "-d"],
+                docker_cmd + ["compose", "up", "-d"],
                 cwd=self.compose_dir,
                 env=env,
                 capture_output=True,
                 text=True,
                 timeout=120,  # 2 minute timeout for pulling images
+                creationflags=_CREATION_FLAGS,
             )
 
             if result.returncode == 0:
@@ -249,13 +333,15 @@ class CloudDesignerManager:
 
         try:
             logger.info("Stopping CloudDesigner stack")
+            docker_cmd = _get_docker_command()
 
             result = subprocess.run(
-                ["docker", "compose", "down"],
+                docker_cmd + ["compose", "down"],
                 cwd=self.compose_dir,
                 capture_output=True,
                 text=True,
                 timeout=60,
+                creationflags=_CREATION_FLAGS,
             )
 
             if result.returncode == 0:
