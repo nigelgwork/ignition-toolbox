@@ -150,6 +150,7 @@ function AppContent() {
 function ExecutionDetailWrapper() {
   const { executionId } = useParams<{ executionId: string }>();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<DomainTab>('gateway');
   const setExecutionUpdate = useStore((state) => state.setExecutionUpdate);
   const setScreenshotFrame = useStore((state) => state.setScreenshotFrame);
   const themeMode = useStore((state) => state.theme);
@@ -178,6 +179,12 @@ function ExecutionDetailWrapper() {
     });
   }, [themeMode]);
 
+  // Handle tab change - navigate back to main app
+  const handleTabChange = (tab: DomainTab) => {
+    setActiveTab(tab);
+    navigate('/');
+  };
+
   if (!executionId) {
     navigate('/');
     return null;
@@ -186,7 +193,9 @@ function ExecutionDetailWrapper() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <ExecutionDetail />
+      <Layout activeTab={activeTab} onTabChange={handleTabChange}>
+        <ExecutionDetail />
+      </Layout>
     </ThemeProvider>
   );
 }
