@@ -52,6 +52,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { PlaybookCard } from '../components/PlaybookCard';
 import { PlaybookExecutionDialog } from '../components/PlaybookExecutionDialog';
@@ -304,6 +305,7 @@ interface PlaybooksProps {
 }
 
 export function Playbooks({ domainFilter }: PlaybooksProps) {
+  const navigate = useNavigate();
   const { gap, gridSpacing } = useDensity();
   const [selectedPlaybook, setSelectedPlaybook] = useState<PlaybookInfo | null>(null);
   const [dragEnabled, setDragEnabled] = useState(false);
@@ -429,7 +431,7 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
       }).then(response => {
         console.log('Execution started successfully:', response);
         // Navigate to execution detail page AFTER getting execution ID
-        window.location.href = `/executions/${response.execution_id}`;
+        navigate(`/executions/${response.execution_id}`);
       }).catch(error => {
         console.error('Failed to execute playbook:', error);
         console.error('Error details:', error instanceof Error ? error.message : String(error));
@@ -481,7 +483,7 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
         timeout_overrides: savedConfig.timeoutOverrides, // Include timeout overrides from saved config
       }).then(response => {
         // Navigate to execution detail page AFTER getting execution ID
-        window.location.href = `/executions/${response.execution_id}`;
+        navigate(`/executions/${response.execution_id}`);
       }).catch(error => {
         console.error('Failed to execute playbook:', error);
         alert('Failed to start execution. Please check the console for details.');
