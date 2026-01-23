@@ -82,10 +82,13 @@ class PlaybookMetadataStore:
 
         Args:
             metadata_file: Path to metadata JSON file
-                          (default: ~/.ignition-toolkit/playbook_metadata.json)
+                          (default: uses get_toolkit_data_dir()/playbook_metadata.json)
         """
         if metadata_file is None:
-            config_dir = Path.home() / ".ignition-toolkit"
+            # Use the toolkit data directory which respects IGNITION_TOOLKIT_DATA env var
+            from ignition_toolkit.config import get_toolkit_data_dir
+
+            config_dir = get_toolkit_data_dir()
             config_dir.mkdir(parents=True, exist_ok=True)
             metadata_file = config_dir / "playbook_metadata.json"
 
