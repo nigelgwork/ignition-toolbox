@@ -175,6 +175,23 @@ export class PythonBackend {
     console.log(`[Backend] Working directory: ${cwd}`);
     console.log(`[Backend] Port: ${this.port}`);
 
+    // Determine Playwright browsers path
+    // In production: use bundled browsers from resources
+    // In development: use default location
+    let playwrightBrowsersPath: string;
+    if (app.isPackaged) {
+      playwrightBrowsersPath = path.join(process.resourcesPath, 'playwright-browsers');
+    } else {
+      // Development: check for local playwright-browsers first, then use default
+      const localBrowsers = path.join(__dirname, '../../playwright-browsers');
+      if (fs.existsSync(localBrowsers)) {
+        playwrightBrowsersPath = localBrowsers;
+      } else {
+        // Let Playwright use its default location
+        playwrightBrowsersPath = '';
+      }
+    }
+
     // Set environment variables
     const env = {
       ...process.env,
@@ -183,7 +200,13 @@ export class PythonBackend {
       PYTHONUNBUFFERED: '1',
       // Use app data directory for toolkit data
       IGNITION_TOOLKIT_DATA: path.join(app.getPath('userData'), 'toolkit-data'),
+      // Use bundled Playwright browsers in production
+      ...(playwrightBrowsersPath && { PLAYWRIGHT_BROWSERS_PATH: playwrightBrowsersPath }),
     };
+
+    if (playwrightBrowsersPath) {
+      console.log(`[Backend] Playwright browsers path: ${playwrightBrowsersPath}`);
+    }
 
     // Ensure data directory exists
     const dataDir = env.IGNITION_TOOLKIT_DATA;

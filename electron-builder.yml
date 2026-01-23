@@ -16,6 +16,11 @@ extraResources:
     to: backend
     filter:
       - "**/*"
+  # Include pre-installed Playwright browsers (avoids runtime download)
+  - from: playwright-browsers
+    to: playwright-browsers
+    filter:
+      - "**/*"
 
 # Windows configuration
 win:
