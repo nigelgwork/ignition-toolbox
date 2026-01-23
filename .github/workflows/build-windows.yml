@@ -57,12 +57,38 @@ jobs:
       - name: Install Playwright browsers to bundle directory
         run: |
           # Install browsers to a directory that will be bundled with the app
-          $env:PLAYWRIGHT_BROWSERS_PATH = "${{ github.workspace }}/playwright-browsers"
+          $browserPath = Join-Path ${{ github.workspace }} "playwright-browsers"
+          $env:PLAYWRIGHT_BROWSERS_PATH = $browserPath
+          Write-Host "Installing Playwright browsers to: $browserPath"
+
           cd backend
           python -m playwright install chromium
-          # Show what was installed
-          Write-Host "Playwright browsers installed to: $env:PLAYWRIGHT_BROWSERS_PATH"
-          Get-ChildItem -Recurse "${{ github.workspace }}/playwright-browsers" | Select-Object FullName
+
+          # Verify installation
+          Write-Host "Verifying browser installation..."
+          if (Test-Path $browserPath) {
+            Write-Host "✅ Browser directory exists at: $browserPath"
+            Get-ChildItem $browserPath | ForEach-Object { Write-Host "  - $($_.Name)" }
+          } else {
+            Write-Host "❌ ERROR: Browser directory not found!"
+            exit 1
+          }
+
+      - name: Verify playwright-browsers before packaging
+        run: |
+          $browserPath = Join-Path ${{ github.workspace }} "playwright-browsers"
+          Write-Host "Checking playwright-browsers directory..."
+          if (Test-Path $browserPath) {
+            Write-Host "✅ Found: $browserPath"
+            $size = (Get-ChildItem -Recurse $browserPath | Measure-Object -Property Length -Sum).Sum / 1MB
+            Write-Host "   Total size: $([math]::Round($size, 2)) MB"
+            Get-ChildItem $browserPath | ForEach-Object {
+              Write-Host "   - $($_.Name)"
+            }
+          } else {
+            Write-Host "❌ playwright-browsers directory NOT FOUND"
+            exit 1
+          }
 
       - name: Build application
         run: npm run build
@@ -71,6 +97,20 @@ jobs:
         run: |
           cd backend
           pyinstaller backend.spec --clean --noconfirm
+
+      - name: List project contents before packaging
+        run: |
+          Write-Host "Project root contents:"
+          Get-ChildItem | ForEach-Object { Write-Host "  $($_.Name)" }
+          Write-Host ""
+          Write-Host "Checking critical directories for electron-builder..."
+          @("backend/dist/backend", "playwright-browsers", "frontend/dist", "dist-electron") | ForEach-Object {
+            if (Test-Path $_) {
+              Write-Host "  ✅ $_ exists"
+            } else {
+              Write-Host "  ❌ $_ NOT FOUND"
+            }
+          }
 
       - name: Build Windows installer
         env:
