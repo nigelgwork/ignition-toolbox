@@ -184,6 +184,11 @@ export const api = {
           }),
         }
       ),
+    resetMetadata: () =>
+      fetchJSON<{ status: string; message: string }>(
+        '/api/playbooks/metadata/reset-all',
+        { method: 'POST' }
+      ),
   },
 
   /**

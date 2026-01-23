@@ -225,6 +225,16 @@ class PlaybookMetadataStore:
         """
         return self._metadata.copy()
 
+    def reset_all(self):
+        """
+        Reset all playbook metadata (clears all verification states, etc.)
+
+        This is useful for troubleshooting path-related issues.
+        """
+        self._metadata = {}
+        self._save()
+        logger.info("Reset all playbook metadata")
+
     def mark_as_built_in(self, playbook_path: str):
         """
         Mark playbook as built-in (shipped with toolkit)

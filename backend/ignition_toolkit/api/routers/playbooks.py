@@ -34,6 +34,7 @@ from ignition_toolkit.api.routers.playbook_metadata import (
     unmark_playbook_verified,
     enable_playbook,
     disable_playbook,
+    reset_all_metadata,
 )
 from ignition_toolkit.api.routers.playbook_lifecycle import (
     delete_playbook,
@@ -78,6 +79,9 @@ router.add_api_route("/{playbook_path:path}", get_playbook, methods=["GET"], tag
 # ============================================================================
 # Metadata Operations
 # ============================================================================
+
+# Static metadata route (must come before path-based routes)
+router.add_api_route("/metadata/reset-all", reset_all_metadata, methods=["POST"], tags=["playbooks-metadata"])
 
 router.add_api_route("/{playbook_path:path}/verify", mark_playbook_verified, methods=["POST"], tags=["playbooks-metadata"])
 router.add_api_route("/{playbook_path:path}/unverify", unmark_playbook_verified, methods=["POST"], tags=["playbooks-metadata"])

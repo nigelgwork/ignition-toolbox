@@ -137,3 +137,18 @@ async def disable_playbook(playbook_path: str):
     except Exception as e:
         logger.error(f"Error disabling playbook: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/reset-all")
+async def reset_all_metadata():
+    """Reset all playbook metadata (clears verification states, etc.)"""
+    metadata_store = get_metadata_store()
+    try:
+        metadata_store.reset_all()
+        return {
+            "status": "success",
+            "message": "All playbook metadata has been reset",
+        }
+    except Exception as e:
+        logger.error(f"Error resetting metadata: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -33,6 +33,7 @@ import {
   Add as AddIcon,
   Store as StoreIcon,
   SystemUpdate as UpdateIcon,
+  RestartAlt as ResetIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -658,6 +659,25 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
     input.click();
   };
 
+  const handleResetMetadata = async () => {
+    const confirmed = window.confirm(
+      'Reset all playbook metadata?\n\n' +
+      'This will clear all verification states, enabled/disabled states, and other metadata for all playbooks.\n\n' +
+      'You will need to re-verify any playbooks that require verification.\n\n' +
+      'This is useful for troubleshooting path-related issues on Windows.'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.playbooks.resetMetadata();
+      alert('Playbook metadata has been reset.\n\nRefreshing...');
+      window.location.reload();
+    } catch (error) {
+      alert(`Failed to reset metadata: ${(error as Error).message}`);
+    }
+  };
+
   const handleCreatePlaybook = async () => {
     if (!newPlaybookName.trim()) {
       alert('Please enter a playbook name');
@@ -831,6 +851,16 @@ metadata:
               color="primary"
             >
               <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Reset all playbook metadata (troubleshooting)">
+            <IconButton
+              onClick={handleResetMetadata}
+              size="small"
+              color="warning"
+            >
+              <ResetIcon />
             </IconButton>
           </Tooltip>
         </Box>
