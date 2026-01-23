@@ -41,30 +41,77 @@ def _is_wsl() -> bool:
         return False
 
 
-def _check_wsl_docker() -> bool:
+def _check_wsl_docker() -> tuple[bool, str | None]:
     """
     Check if Docker is available inside WSL (for Windows with WSL2 backend).
 
+    Tries multiple approaches:
+    1. wsl docker --version (default distro)
+    2. wsl -e docker --version (explicit exec)
+    3. wsl -- docker --version (pass-through)
+
     Returns:
-        True if Docker is available via WSL, False otherwise
+        Tuple of (available: bool, version: str | None)
+    """
+    if platform.system() != "Windows":
+        return False, None
+
+    # Different ways to invoke docker via WSL
+    wsl_commands = [
+        ["wsl", "docker", "--version"],
+        ["wsl", "-e", "docker", "--version"],
+        ["wsl", "--", "docker", "--version"],
+    ]
+
+    for cmd in wsl_commands:
+        try:
+            logger.debug(f"Trying WSL Docker detection: {' '.join(cmd)}")
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30,  # Longer timeout for WSL startup
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            if result.returncode == 0:
+                version = result.stdout.strip()
+                logger.info(f"Docker found via WSL: {version}")
+                return True, version
+            else:
+                logger.debug(f"WSL Docker command failed: {result.stderr}")
+        except FileNotFoundError:
+            logger.debug("WSL not found on system")
+            return False, None
+        except subprocess.TimeoutExpired:
+            logger.debug(f"WSL Docker command timed out: {cmd}")
+        except OSError as e:
+            logger.debug(f"WSL Docker check error: {e}")
+
+    return False, None
+
+
+def _check_wsl_docker_running() -> bool:
+    """
+    Check if Docker daemon is running inside WSL.
+
+    Returns:
+        True if Docker daemon is accessible via WSL
     """
     if platform.system() != "Windows":
         return False
 
     try:
         result = subprocess.run(
-            ["wsl", "docker", "--version"],
+            ["wsl", "docker", "info"],
             capture_output=True,
-            timeout=15,
+            text=True,
+            timeout=30,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
-        if result.returncode == 0:
-            logger.info("Docker found via WSL")
-            return True
+        return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
-        logger.debug(f"WSL Docker check failed: {e}")
-
-    return False
+        logger.debug(f"WSL Docker daemon check failed: {e}")
+        return False
 
 
 def _find_docker_executable() -> str | None:
@@ -138,7 +185,9 @@ def _find_docker_executable() -> str | None:
                 return str(path)
 
         # Check if Docker is available via WSL
-        if _check_wsl_docker():
+        wsl_available, wsl_version = _check_wsl_docker()
+        if wsl_available:
+            logger.info(f"Using Docker via WSL: {wsl_version}")
             return "wsl docker"  # Special marker for WSL Docker
 
     return None
@@ -221,13 +270,20 @@ class CloudDesignerManager:
         """Check if docker command is available."""
         try:
             docker_cmd = _get_docker_command()
+            logger.debug(f"Checking Docker installed with command: {docker_cmd}")
             result = subprocess.run(
                 docker_cmd + ["--version"],
                 capture_output=True,
-                timeout=10,  # Increased timeout for WSL startup
+                text=True,
+                timeout=30,  # Longer timeout for WSL startup
                 creationflags=_CREATION_FLAGS,
             )
-            return result.returncode == 0
+            if result.returncode == 0:
+                logger.info(f"Docker installed: {result.stdout.strip()}")
+                return True
+            else:
+                logger.debug(f"Docker check failed: {result.stderr}")
+                return False
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
             logger.debug(f"Docker not found: {e}")
             return False
@@ -236,13 +292,20 @@ class CloudDesignerManager:
         """Check if Docker daemon is running."""
         try:
             docker_cmd = _get_docker_command()
+            logger.debug(f"Checking Docker running with command: {docker_cmd}")
             result = subprocess.run(
                 docker_cmd + ["info"],
                 capture_output=True,
-                timeout=30,  # Increased timeout for WSL2 startup
+                text=True,
+                timeout=45,  # Longer timeout for WSL2 startup
                 creationflags=_CREATION_FLAGS,
             )
-            return result.returncode == 0
+            if result.returncode == 0:
+                logger.info("Docker daemon is running")
+                return True
+            else:
+                logger.debug(f"Docker daemon not running: {result.stderr}")
+                return False
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
             logger.debug(f"Docker daemon not running: {e}")
             return False
@@ -255,7 +318,7 @@ class CloudDesignerManager:
                 docker_cmd + ["--version"],
                 capture_output=True,
                 text=True,
-                timeout=10,
+                timeout=30,  # Longer timeout for WSL
                 creationflags=_CREATION_FLAGS,
             )
             if result.returncode == 0:
@@ -268,16 +331,28 @@ class CloudDesignerManager:
 
     def get_docker_status(self) -> DockerStatus:
         """Get comprehensive Docker status."""
+        logger.info("Checking Docker status...")
         docker_path = _find_docker_executable()
+        logger.info(f"Docker path: {docker_path}")
+
         installed = self.check_docker_installed()
+        logger.info(f"Docker installed: {installed}")
+
         running = self.check_docker_running() if installed else False
+        logger.info(f"Docker running: {running}")
+
         version = self.get_docker_version() if installed else None
+
+        # Provide user-friendly path info
+        display_path = docker_path
+        if docker_path == "wsl docker":
+            display_path = "WSL (Windows Subsystem for Linux)"
 
         return DockerStatus(
             installed=installed,
             running=running,
             version=version,
-            docker_path=docker_path,
+            docker_path=display_path,
         )
 
     def get_container_status(self) -> CloudDesignerStatus:
