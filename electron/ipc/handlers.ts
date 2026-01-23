@@ -134,32 +134,113 @@ export function registerIpcHandlers(pythonBackend: PythonBackend): void {
 
   // CloudDesigner popup window
   ipcMain.handle('clouddesigner:openWindow', async () => {
+    const targetUrl = 'http://localhost:8080';
+    console.log(`CloudDesigner: Opening window for ${targetUrl}`);
+
     const designerWindow = new BrowserWindow({
       width: 1920,
       height: 1080,
-      title: 'Ignition Designer',
+      title: `Ignition Designer - Loading ${targetUrl}`,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        webSecurity: false, // Allow loading localhost content
+        webSecurity: false,
+        allowRunningInsecureContent: true,
       },
     });
 
-    // Debug: open DevTools to see any errors
-    designerWindow.webContents.openDevTools();
+    // Open DevTools docked to bottom for debugging
+    designerWindow.webContents.openDevTools({ mode: 'bottom' });
 
-    // Log load events for debugging
+    // Comprehensive event logging
     designerWindow.webContents.on('did-start-loading', () => {
-      console.log('CloudDesigner: started loading');
-    });
-    designerWindow.webContents.on('did-finish-load', () => {
-      console.log('CloudDesigner: finished loading');
-    });
-    designerWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
-      console.error(`CloudDesigner: failed to load - ${errorCode}: ${errorDescription}`);
+      console.log('CloudDesigner: did-start-loading');
+      designerWindow.setTitle(`Ignition Designer - Loading...`);
     });
 
-    designerWindow.loadURL('http://localhost:8080');
+    designerWindow.webContents.on('did-stop-loading', () => {
+      console.log('CloudDesigner: did-stop-loading');
+    });
+
+    designerWindow.webContents.on('did-finish-load', () => {
+      const url = designerWindow.webContents.getURL();
+      console.log(`CloudDesigner: did-finish-load - URL: ${url}`);
+      designerWindow.setTitle(`Ignition Designer - ${url}`);
+    });
+
+    designerWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+      console.error(`CloudDesigner: did-fail-load - Code: ${errorCode}, Desc: ${errorDescription}, URL: ${validatedURL}`);
+      designerWindow.setTitle(`Ignition Designer - FAILED`);
+
+      // Show error page
+      designerWindow.loadURL(`data:text/html;charset=utf-8,
+        <!DOCTYPE html>
+        <html>
+        <head><title>CloudDesigner Error</title></head>
+        <body style="background:#1a1a2e;color:#fff;font-family:system-ui;padding:40px;">
+          <h1 style="color:#ff6b6b;">Failed to Load CloudDesigner</h1>
+          <div style="background:#2a2a4e;padding:20px;border-radius:8px;margin:20px 0;">
+            <p><strong>URL:</strong> ${validatedURL}</p>
+            <p><strong>Error Code:</strong> ${errorCode}</p>
+            <p><strong>Description:</strong> ${errorDescription}</p>
+          </div>
+          <h2>Troubleshooting:</h2>
+          <ol style="line-height:2;">
+            <li>Make sure the Docker container is running</li>
+            <li>Check if port 8080 is accessible: <code>curl http://localhost:8080</code></li>
+            <li>Check Docker logs: <code>docker logs clouddesigner-nginx</code></li>
+          </ol>
+        </body>
+        </html>
+      `);
+    });
+
+    designerWindow.webContents.on('dom-ready', () => {
+      console.log('CloudDesigner: dom-ready');
+    });
+
+    designerWindow.webContents.on('did-navigate', (_event, url) => {
+      console.log(`CloudDesigner: did-navigate to ${url}`);
+    });
+
+    designerWindow.webContents.on('did-navigate-in-page', (_event, url) => {
+      console.log(`CloudDesigner: did-navigate-in-page to ${url}`);
+    });
+
+    designerWindow.webContents.on('render-process-gone', (_event, details) => {
+      console.error(`CloudDesigner: render-process-gone - reason: ${details.reason}`);
+    });
+
+    designerWindow.webContents.on('unresponsive', () => {
+      console.warn('CloudDesigner: window became unresponsive');
+    });
+
+    designerWindow.webContents.on('responsive', () => {
+      console.log('CloudDesigner: window became responsive again');
+    });
+
+    // Log console messages from the loaded page
+    designerWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+      const levelStr = ['verbose', 'info', 'warning', 'error'][level] || 'unknown';
+      console.log(`CloudDesigner console [${levelStr}]: ${message} (${sourceId}:${line})`);
+    });
+
+    // Handle certificate errors
+    designerWindow.webContents.on('certificate-error', (event, url, error, certificate, callback) => {
+      console.warn(`CloudDesigner: certificate-error for ${url}: ${error}`);
+      // Allow localhost certificates
+      if (url.includes('localhost')) {
+        event.preventDefault();
+        callback(true);
+      } else {
+        callback(false);
+      }
+    });
+
+    console.log(`CloudDesigner: Calling loadURL(${targetUrl})`);
+    designerWindow.loadURL(targetUrl);
+    console.log('CloudDesigner: loadURL called');
+
     return true;
   });
 
