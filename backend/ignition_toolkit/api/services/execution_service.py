@@ -343,6 +343,9 @@ class ExecutionService:
                 logger.exception(f"  Exception message: {str(e)}")
                 self.execution_manager.mark_completed(execution_id)
 
+                # Broadcast error status to frontend
+                await self._update_error_status(execution_id, engine, str(e))
+
             finally:
                 # Exit gateway client context
                 if gateway_client:
@@ -388,6 +391,57 @@ class ExecutionService:
                 execution_state.completed_at = datetime.now()
                 await self.state_update_callback(execution_state)
                 logger.info(f"Broadcasted cancellation for {execution_id}")
+
+    async def _update_error_status(
+        self, execution_id: str, engine: PlaybookEngine, error_message: str
+    ) -> None:
+        """
+        Update database and broadcast error status when execution fails
+
+        Args:
+            execution_id: Execution UUID
+            engine: PlaybookEngine instance
+            error_message: Error message to store
+        """
+        # Update database
+        with self.database.session_scope() as session:
+            from ignition_toolkit.storage import ExecutionModel
+
+            execution = (
+                session.query(ExecutionModel)
+                .filter_by(execution_id=execution_id)
+                .first()
+            )
+            if execution:
+                execution.status = "failed"
+                execution.completed_at = datetime.now()
+                execution.error_message = error_message
+                session.commit()
+                logger.info(f"Updated execution {execution_id} status to 'failed' with error: {error_message}")
+
+        # Broadcast failure
+        if self.state_update_callback:
+            execution_state = engine.get_current_execution()
+            if execution_state:
+                execution_state.status = ExecutionStatus.FAILED
+                execution_state.completed_at = datetime.now()
+                execution_state.error = error_message
+                await self.state_update_callback(execution_state)
+                logger.info(f"Broadcasted failure for {execution_id}")
+            else:
+                # No execution state yet - create a minimal one
+                from ignition_toolkit.playbook.models import ExecutionState
+                minimal_state = ExecutionState(
+                    execution_id=execution_id,
+                    playbook_name="Unknown",
+                    status=ExecutionStatus.FAILED,
+                    started_at=datetime.now(),
+                    completed_at=datetime.now(),
+                    step_results=[],
+                    error=error_message,
+                )
+                await self.state_update_callback(minimal_state)
+                logger.info(f"Broadcasted minimal failure state for {execution_id}")
 
     async def _timeout_watchdog(
         self,

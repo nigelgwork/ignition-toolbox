@@ -339,6 +339,31 @@ export function ExecutionDetail() {
         </Box>
       )}
 
+      {/* Execution Error Alert */}
+      {execution.error && (
+        <Box sx={{ px: 2, py: 1, flexShrink: 0 }}>
+          <Alert severity="error" sx={{ '& .MuiAlert-message': { width: '100%' } }}>
+            <Typography variant="subtitle2" fontWeight="bold">Execution Error</Typography>
+            <Typography variant="body2" sx={{ mt: 0.5, fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {execution.error}
+            </Typography>
+          </Alert>
+        </Box>
+      )}
+
+      {/* No Steps Warning */}
+      {!execution.error && deduplicatedStepResults.length === 0 && execution.status !== 'running' && (
+        <Box sx={{ px: 2, py: 1, flexShrink: 0 }}>
+          <Alert severity="warning">
+            <Typography variant="subtitle2" fontWeight="bold">No Steps Executed</Typography>
+            <Typography variant="body2" sx={{ mt: 0.5 }}>
+              The execution did not run any steps. This could indicate an issue with playbook loading,
+              credential validation, or gateway connection. Check the backend logs for more details.
+            </Typography>
+          </Alert>
+        </Box>
+      )}
+
       {/* Split Pane */}
       <Box
         sx={{
