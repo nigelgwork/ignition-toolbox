@@ -87,8 +87,9 @@ export function PlaybookExecutionDialog({
         // Load defaults
         const defaultParams: Record<string, string> = {};
         playbook.parameters.forEach((param) => {
-          if (param.default) {
-            defaultParams[param.name] = param.default;
+          // Check for non-null/undefined defaults (including false, 0, empty string)
+          if (param.default !== null && param.default !== undefined) {
+            defaultParams[param.name] = String(param.default);
           }
         });
 

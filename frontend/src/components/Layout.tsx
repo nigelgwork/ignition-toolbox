@@ -59,6 +59,7 @@ interface LayoutProps {
 export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
   const globalCredential = useStore((state) => state.globalCredential);
   const setGlobalCredential = useStore((state) => state.setGlobalCredential);
+  const setSelectedCredential = useStore((state) => state.setSelectedCredential);
   const updateStatus = useStore((state) => state.updateStatus);
   const setUpdateStatus = useStore((state) => state.setUpdateStatus);
   const [credentialAnchor, setCredentialAnchor] = useState<null | HTMLElement>(null);
@@ -108,6 +109,18 @@ export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
     }
   }, [setUpdateStatus]);
 
+  // Restore credential from localStorage when credentials are fetched
+  useEffect(() => {
+    const savedCredentialName = localStorage.getItem('selectedCredentialName');
+    if (savedCredentialName && credentials.length > 0) {
+      const fullCredential = credentials.find((c) => c.name === savedCredentialName);
+      if (fullCredential) {
+        setGlobalCredential(savedCredentialName);
+        setSelectedCredential(fullCredential);
+      }
+    }
+  }, [credentials, setGlobalCredential, setSelectedCredential]);
+
   const handleCredentialClick = (event: React.MouseEvent<HTMLElement>) => {
     setCredentialAnchor(event.currentTarget);
   };
@@ -118,6 +131,16 @@ export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
 
   const handleCredentialSelect = (credentialName: string | null) => {
     setGlobalCredential(credentialName);
+    // Also set the full credential object for PlaybookCard/execution
+    if (credentialName) {
+      const fullCredential = credentials.find((c) => c.name === credentialName);
+      setSelectedCredential(fullCredential || null);
+      // Persist to localStorage
+      localStorage.setItem('selectedCredentialName', credentialName);
+    } else {
+      setSelectedCredential(null);
+      localStorage.removeItem('selectedCredentialName');
+    }
     handleCredentialClose();
   };
 

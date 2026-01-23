@@ -72,10 +72,17 @@ export function ParameterInput({
     }
   };
 
+  // For module-type boolean parameters, show friendlier label
+  const isModuleSigningParam = parameter.type === 'boolean' && (
+    parameter.name.toLowerCase().includes('module_type') ||
+    parameter.name.toLowerCase().includes('unsigned')
+  );
+  const displayLabel = isModuleSigningParam ? 'Module Signing' : parameter.name;
+
   return (
     <FormControl fullWidth>
       <FormLabel htmlFor={`param-${parameter.name}`} sx={{ mb: 0.5, fontSize: '0.875rem' }}>
-        {parameter.name}
+        {displayLabel}
         {parameter.required && ' *'}
       </FormLabel>
 
