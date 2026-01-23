@@ -146,6 +146,9 @@ export function registerIpcHandlers(pythonBackend: PythonBackend): void {
         contextIsolation: true,
         webSecurity: false,
         allowRunningInsecureContent: true,
+        webviewTag: true,
+        plugins: true,
+        experimentalFeatures: true,
       },
     });
 
