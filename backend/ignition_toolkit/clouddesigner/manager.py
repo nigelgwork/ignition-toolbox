@@ -49,6 +49,7 @@ def _check_wsl_docker() -> tuple[bool, str | None]:
     1. wsl docker --version (default distro)
     2. wsl -e docker --version (explicit exec)
     3. wsl -- docker --version (pass-through)
+    4. Specific distributions: Ubuntu, Debian, etc.
 
     Returns:
         Tuple of (available: bool, version: str | None)
@@ -73,6 +74,12 @@ def _check_wsl_docker() -> tuple[bool, str | None]:
         ["wsl", "docker", "--version"],
         ["wsl", "-e", "docker", "--version"],
         ["wsl", "--", "docker", "--version"],
+        # Try specific common distributions
+        ["wsl", "-d", "Ubuntu", "docker", "--version"],
+        ["wsl", "-d", "Ubuntu-22.04", "docker", "--version"],
+        ["wsl", "-d", "Ubuntu-24.04", "docker", "--version"],
+        ["wsl", "-d", "Debian", "docker", "--version"],
+        ["wsl", "-d", "docker-desktop", "docker", "--version"],
     ]
 
     for cmd in wsl_commands:
@@ -88,10 +95,12 @@ def _check_wsl_docker() -> tuple[bool, str | None]:
             logger.info(f"WSL Docker result: returncode={result.returncode}, stdout={result.stdout[:100] if result.stdout else ''}, stderr={result.stderr[:100] if result.stderr else ''}")
             if result.returncode == 0:
                 version = result.stdout.strip()
-                logger.info(f"Docker found via WSL: {version}")
+                # Extract distro name for logging if using -d flag
+                distro = cmd[cmd.index("-d") + 1] if "-d" in cmd else "default"
+                logger.info(f"Docker found via WSL ({distro}): {version}")
                 return True, version
             else:
-                logger.info(f"WSL Docker command failed: {result.stderr}")
+                logger.info(f"WSL Docker command failed: {result.stderr[:100] if result.stderr else 'no error'}")
         except FileNotFoundError as e:
             logger.info(f"WSL command not found: {e}")
             return False, None
@@ -114,18 +123,31 @@ def _check_wsl_docker_running() -> bool:
     if platform.system() != "Windows":
         return False
 
-    try:
-        result = subprocess.run(
-            ["wsl", "docker", "info"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-        return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
-        logger.debug(f"WSL Docker daemon check failed: {e}")
-        return False
+    # Try multiple approaches including specific distros
+    wsl_commands = [
+        ["wsl", "docker", "info"],
+        ["wsl", "-d", "Ubuntu", "docker", "info"],
+        ["wsl", "-d", "Ubuntu-22.04", "docker", "info"],
+        ["wsl", "-d", "Ubuntu-24.04", "docker", "info"],
+        ["wsl", "-d", "Debian", "docker", "info"],
+    ]
+
+    for cmd in wsl_commands:
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            if result.returncode == 0:
+                logger.info(f"WSL Docker daemon running via: {' '.join(cmd)}")
+                return True
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
+            logger.debug(f"WSL Docker daemon check failed for {cmd}: {e}")
+
+    return False
 
 
 def _find_docker_executable() -> str | None:
