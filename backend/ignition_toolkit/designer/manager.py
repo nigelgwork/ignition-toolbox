@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from ignition_toolkit.designer.detector import detect_designer_installation, get_java_command
+from ignition_toolkit.core.paths import get_screenshots_dir, get_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +51,9 @@ class DesignerManager:
             downloads_dir: Directory for JNLP/launcher downloads
         """
         self.install_path = install_path or detect_designer_installation()
-        self.screenshots_dir = screenshots_dir or Path("./data/screenshots")
+        self.screenshots_dir = screenshots_dir or get_screenshots_dir()
         self.screenshots_dir.mkdir(parents=True, exist_ok=True)
-        self.downloads_dir = downloads_dir or Path("./data/downloads")
+        self.downloads_dir = downloads_dir or (get_data_dir() / "downloads")
         self.downloads_dir.mkdir(parents=True, exist_ok=True)
 
         # Platform detection

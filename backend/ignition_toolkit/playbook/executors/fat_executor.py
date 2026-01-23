@@ -12,6 +12,7 @@ from typing import Any
 
 from ignition_toolkit.playbook.exceptions import StepExecutionError
 from ignition_toolkit.playbook.executors.base import StepHandler
+from ignition_toolkit.core.paths import get_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ class FATGenerateReportHandler(StepHandler):
 
         # Save report to file
         report_id = f"fat_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        report_dir = Path("./data/reports")
+        report_dir = get_data_dir() / "reports"
         report_dir.mkdir(parents=True, exist_ok=True)
 
         report_path = report_dir / f"{report_id}.html"
@@ -493,7 +494,7 @@ class FATExportReportHandler(StepHandler):
             )
 
         # For prototype, just copy the HTML report to specified location
-        report_dir = Path("./data/reports")
+        report_dir = get_data_dir() / "reports"
         source_path = report_dir / f"{report_id}.html"
 
         if not source_path.exists():

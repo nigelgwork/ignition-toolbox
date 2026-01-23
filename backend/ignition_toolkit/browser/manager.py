@@ -19,6 +19,8 @@ from typing import Any
 
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
+from ignition_toolkit.core.paths import get_screenshots_dir, get_data_dir
+
 logger = logging.getLogger(__name__)
 
 # Screenshot streaming configuration
@@ -58,9 +60,9 @@ class BrowserManager:
         """
         self.headless = headless
         self.slow_mo = slow_mo
-        self.screenshots_dir = screenshots_dir or Path("./data/screenshots")
+        self.screenshots_dir = screenshots_dir or get_screenshots_dir()
         self.screenshots_dir.mkdir(parents=True, exist_ok=True)
-        self.downloads_dir = downloads_dir or Path("./data/downloads")
+        self.downloads_dir = downloads_dir or (get_data_dir() / "downloads")
         self.downloads_dir.mkdir(parents=True, exist_ok=True)
         self.screenshot_callback = screenshot_callback
 
