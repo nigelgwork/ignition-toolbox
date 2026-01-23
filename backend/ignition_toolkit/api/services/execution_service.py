@@ -103,40 +103,57 @@ class ExecutionService:
         Raises:
             HTTPException: If playbook not found or validation fails
         """
+        logger.info(f"=== EXECUTION START: {playbook_path} ===")
+        logger.info(f"  credential_name: {credential_name}")
+        logger.info(f"  gateway_url: {gateway_url}")
+        logger.info(f"  parameters: {parameters}")
+        logger.info(f"  debug_mode: {debug_mode}")
+
         # Step 1: Validate and load playbook
+        logger.info("Step 1: Validating and loading playbook...")
         playbooks_dir, full_playbook_path = PathValidator.validate_and_resolve(
             playbook_path, must_exist=True
         )
         playbook = PlaybookLoader.load_from_file(full_playbook_path)
+        logger.info(f"  Loaded playbook: {playbook.name} with {len(playbook.steps)} steps")
 
         # Step 1.5: Ensure browser is installed for playbooks that need it
         playbook_domain = playbook.metadata.get("domain")
+        logger.info(f"  Playbook domain: {playbook_domain}")
         if playbook_domain and playbook_domain.lower() != "gateway":
+            logger.info("  Ensuring browser is available for non-gateway playbook...")
             await self._ensure_browser_available()
 
         # Step 2: Apply credential autofill
+        logger.info("Step 2: Applying credential autofill...")
         gateway_url, parameters = self.credential_manager.apply_autofill(
             playbook=playbook,
             credential_name=credential_name,
             gateway_url=gateway_url,
             parameters=parameters,
         )
+        logger.info(f"  After autofill - gateway_url: {gateway_url}")
+        logger.info(f"  After autofill - parameters: {list(parameters.keys())}")
 
         # Step 3: Generate execution ID
         execution_id = str(uuid.uuid4())
+        logger.info(f"Step 3: Generated execution ID: {execution_id}")
 
         # Step 4: Create PlaybookEngine with callbacks
+        logger.info("Step 4: Creating PlaybookEngine...")
         engine, gateway_client = await self._create_engine(
             gateway_url=gateway_url,
             execution_id=execution_id,
             debug_mode=debug_mode,
             timeout_overrides=timeout_overrides,
         )
+        logger.info(f"  Engine created, gateway_client: {gateway_client is not None}")
 
         # Step 5: Initial state broadcast - SKIP (engine handles this to avoid duplicates)
         # The engine will broadcast initial state when execute_playbook() is called
 
         # Step 6: Create and start background execution
+        logger.info("Step 6: Creating runner and starting background execution...")
         runner = self._create_runner(
             engine=engine,
             playbook=playbook,
@@ -151,6 +168,7 @@ class ExecutionService:
             engine=engine,
             runner=runner,
         )
+        logger.info("  Background execution started")
 
         # Step 7: Start timeout watchdog
         task = self.execution_manager.get_task(execution_id)
@@ -158,10 +176,11 @@ class ExecutionService:
             asyncio.create_task(
                 self._timeout_watchdog(execution_id, task, engine, timeout_seconds)
             )
+            logger.info(f"  Timeout watchdog started ({timeout_seconds}s)")
 
         logger.info(
-            f"Started execution {execution_id} for playbook '{playbook.name}' "
-            f"(debug_mode={debug_mode}, timeout={timeout_seconds}s)"
+            f"=== EXECUTION STARTED: {execution_id} for '{playbook.name}' "
+            f"(debug_mode={debug_mode}) ==="
         )
 
         return execution_id
@@ -282,14 +301,20 @@ class ExecutionService:
 
         async def run_execution():
             """Execute playbook in background"""
-            logger.info(f"Starting background execution for {execution_id}")
+            logger.info(f"=== RUNNER START: {execution_id} ===")
+            logger.info(f"  Playbook: {playbook.name}")
+            logger.info(f"  Parameters: {list(parameters.keys())}")
+            logger.info(f"  Gateway client: {gateway_client is not None}")
 
             try:
                 # Enter gateway client context if present
                 if gateway_client:
+                    logger.info("  Entering gateway client context...")
                     await gateway_client.__aenter__()
+                    logger.info("  Gateway client context entered")
 
                 # Execute playbook
+                logger.info("  Calling engine.execute_playbook()...")
                 execution_state = await engine.execute_playbook(
                     playbook,
                     parameters,
@@ -299,26 +324,29 @@ class ExecutionService:
                 )
 
                 logger.info(
-                    f"Execution {execution_state.execution_id} completed with "
-                    f"status: {execution_state.status}"
+                    f"=== RUNNER COMPLETE: {execution_state.execution_id} "
+                    f"status={execution_state.status} ==="
                 )
 
                 # Mark completion
                 self.execution_manager.mark_completed(execution_id)
 
             except asyncio.CancelledError:
-                logger.warning(f"Execution {execution_id} was cancelled")
+                logger.warning(f"=== RUNNER CANCELLED: {execution_id} ===")
                 self.execution_manager.mark_completed(execution_id)
                 await self._update_cancelled_status(execution_id, engine)
                 raise
 
             except Exception as e:
-                logger.exception(f"Error in execution {execution_id}: {e}")
+                logger.exception(f"=== RUNNER ERROR: {execution_id} ===")
+                logger.exception(f"  Exception type: {type(e).__name__}")
+                logger.exception(f"  Exception message: {str(e)}")
                 self.execution_manager.mark_completed(execution_id)
 
             finally:
                 # Exit gateway client context
                 if gateway_client:
+                    logger.info(f"  Exiting gateway client context for {execution_id}")
                     await gateway_client.__aexit__(None, None, None)
 
                 # NOTE: Task cleanup is handled by TTL mechanism, not here
