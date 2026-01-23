@@ -308,6 +308,19 @@ interface PlaybooksProps {
 export function Playbooks({ domainFilter }: PlaybooksProps) {
   const navigate = useNavigate();
   const { gap, gridSpacing } = useDensity();
+  const playbookGridColumns = useStore((state) => state.playbookGridColumns);
+
+  // Generate responsive grid columns based on max setting
+  const getGridColumns = (forCategory = false) => {
+    const max = forCategory ? Math.max(3, playbookGridColumns - 1) : playbookGridColumns;
+    return {
+      xs: '1fr',
+      sm: 'repeat(2, 1fr)',
+      md: `repeat(${Math.min(3, max)}, 1fr)`,
+      lg: `repeat(${Math.min(forCategory ? 3 : 4, max)}, 1fr)`,
+      xl: `repeat(${max}, 1fr)`,
+    };
+  };
   const [selectedPlaybook, setSelectedPlaybook] = useState<PlaybookInfo | null>(null);
   const [dragEnabled, setDragEnabled] = useState(false);
   const [stepsDialogPlaybook, setStepsDialogPlaybook] = useState<PlaybookInfo | null>(null);
@@ -911,13 +924,7 @@ metadata:
                     <Box
                       sx={{
                         display: 'grid',
-                        gridTemplateColumns: {
-                          xs: '1fr',
-                          sm: 'repeat(2, 1fr)',
-                          md: 'repeat(3, 1fr)',
-                          lg: 'repeat(4, 1fr)',
-                          xl: 'repeat(5, 1fr)',
-                        },
+                        gridTemplateColumns: getGridColumns(),
                         gap: gridSpacing,
                       }}
                     >
@@ -960,13 +967,7 @@ metadata:
                         <Box
                           sx={{
                             display: 'grid',
-                            gridTemplateColumns: {
-                              xs: '1fr',
-                              sm: 'repeat(2, 1fr)',
-                              md: 'repeat(3, 1fr)',
-                              lg: 'repeat(4, 1fr)',
-                              xl: 'repeat(5, 1fr)',
-                            },
+                            gridTemplateColumns: getGridColumns(),
                             gap: gridSpacing,
                           }}
                         >
@@ -1048,13 +1049,7 @@ metadata:
                                     <Box
                                       sx={{
                                         display: 'grid',
-                                        gridTemplateColumns: {
-                                          xs: '1fr',
-                                          sm: 'repeat(2, 1fr)',
-                                          md: 'repeat(3, 1fr)',
-                                          lg: 'repeat(3, 1fr)',
-                                          xl: 'repeat(4, 1fr)',
-                                        },
+                                        gridTemplateColumns: getGridColumns(true),
                                         gap: gridSpacing,
                                       }}
                                     >
@@ -1100,13 +1095,7 @@ metadata:
                                         <Box
                                           sx={{
                                             display: 'grid',
-                                            gridTemplateColumns: {
-                                              xs: '1fr',
-                                              sm: 'repeat(2, 1fr)',
-                                              md: 'repeat(3, 1fr)',
-                                              lg: 'repeat(3, 1fr)',
-                                              xl: 'repeat(4, 1fr)',
-                                            },
+                                            gridTemplateColumns: getGridColumns(true),
                                             gap: gridSpacing,
                                           }}
                                         >
@@ -1138,13 +1127,7 @@ metadata:
                               <Box
                                 sx={{
                                   display: 'grid',
-                                  gridTemplateColumns: {
-                                    xs: '1fr',
-                                    sm: 'repeat(2, 1fr)',
-                                    md: 'repeat(3, 1fr)',
-                                    lg: 'repeat(3, 1fr)',
-                                    xl: 'repeat(4, 1fr)',
-                                  },
+                                  gridTemplateColumns: getGridColumns(true),
                                   gap: gridSpacing,
                                 }}
                               >

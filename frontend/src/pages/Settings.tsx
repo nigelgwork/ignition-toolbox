@@ -41,6 +41,7 @@ import {
   ViewCompact as CompactIcon,
   ViewComfy as ComfortableIcon,
   ViewModule as SpaciousIcon,
+  GridView as GridIcon,
 } from '@mui/icons-material';
 import { Credentials } from './Credentials';
 import { Executions } from './Executions';
@@ -92,6 +93,8 @@ export function Settings() {
   const setTheme = useStore((state) => state.setTheme);
   const density = useStore((state) => state.density);
   const setDensity = useStore((state) => state.setDensity);
+  const playbookGridColumns = useStore((state) => state.playbookGridColumns);
+  const setPlaybookGridColumns = useStore((state) => state.setPlaybookGridColumns);
 
   // Get app version and health on mount
   useEffect(() => {
@@ -609,6 +612,58 @@ export function Settings() {
                   </Box>
                 }
               />
+            </RadioGroup>
+          </FormControl>
+        </Paper>
+
+        {/* Playbook Grid Columns Section */}
+        <Paper
+          sx={{
+            p: 3,
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
+            Playbook Grid
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <GridIcon sx={{ color: 'primary.main' }} />
+            <Box>
+              <Typography variant="body1" fontWeight="medium">
+                Maximum Columns
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Maximum number of playbook cards per row on large screens
+              </Typography>
+            </Box>
+          </Box>
+
+          <FormControl component="fieldset">
+            <RadioGroup
+              row
+              value={playbookGridColumns}
+              onChange={(e) => setPlaybookGridColumns(parseInt(e.target.value, 10) as 3 | 4 | 5 | 6)}
+            >
+              {[3, 4, 5, 6].map((cols) => (
+                <FormControlLabel
+                  key={cols}
+                  value={cols}
+                  control={<Radio size="small" />}
+                  label={
+                    <Typography
+                      variant="body2"
+                      fontWeight={playbookGridColumns === cols ? 'medium' : 'normal'}
+                    >
+                      {cols}
+                    </Typography>
+                  }
+                  sx={{ mr: 3 }}
+                />
+              ))}
             </RadioGroup>
           </FormControl>
         </Paper>

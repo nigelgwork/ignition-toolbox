@@ -18,6 +18,14 @@ const getInitialDensity = (): Density => {
   return (stored === 'compact' || stored === 'comfortable' || stored === 'spacious') ? stored : 'comfortable';
 };
 
+// Initialize playbook grid columns from localStorage or default to 5
+export type PlaybookGridColumns = 3 | 4 | 5 | 6;
+const getInitialPlaybookGridColumns = (): PlaybookGridColumns => {
+  const stored = localStorage.getItem('playbookGridColumns');
+  const parsed = stored ? parseInt(stored, 10) : 5;
+  return (parsed === 3 || parsed === 4 || parsed === 5 || parsed === 6) ? parsed : 5;
+};
+
 interface ScreenshotFrame {
   executionId: string;
   screenshot: string; // base64 encoded JPEG
@@ -63,6 +71,10 @@ interface AppState {
   // Display density
   density: Density;
   setDensity: (density: Density) => void;
+
+  // Playbook grid columns
+  playbookGridColumns: PlaybookGridColumns;
+  setPlaybookGridColumns: (columns: PlaybookGridColumns) => void;
 
   // Global credential name (for header dropdown)
   globalCredential: string | null;
@@ -118,6 +130,12 @@ export const useStore = create<AppState>((set) => ({
   setDensity: (density) => {
     localStorage.setItem('density', density);
     set({ density });
+  },
+
+  playbookGridColumns: getInitialPlaybookGridColumns(),
+  setPlaybookGridColumns: (columns) => {
+    localStorage.setItem('playbookGridColumns', columns.toString());
+    set({ playbookGridColumns: columns });
   },
 
   globalCredential: null,

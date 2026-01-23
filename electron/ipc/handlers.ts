@@ -138,11 +138,33 @@ export function registerIpcHandlers(pythonBackend: PythonBackend): void {
       width: 1920,
       height: 1080,
       title: 'Ignition Designer',
+      show: false, // Don't show until content is loaded
+      backgroundColor: '#1a1a2e', // Dark background to prevent white flash
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
       },
     });
+
+    // Show window when content is ready
+    designerWindow.once('ready-to-show', () => {
+      designerWindow.show();
+    });
+
+    // Handle load failures
+    designerWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+      console.error(`CloudDesigner window failed to load: ${errorCode} - ${errorDescription}`);
+      designerWindow.loadURL(`data:text/html,
+        <html>
+          <body style="background:#1a1a2e;color:#fff;font-family:system-ui;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;">
+            <h2>Failed to connect to CloudDesigner</h2>
+            <p>Error: ${errorDescription}</p>
+            <p style="color:#888;">Make sure the Docker container is running on port 8080</p>
+          </body>
+        </html>
+      `);
+    });
+
     designerWindow.loadURL('http://localhost:8080');
     return true;
   });
