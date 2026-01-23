@@ -643,6 +643,75 @@ export const api = {
   },
 
   /**
+   * Backend Logs - Access logs from the UI
+   */
+  logs: {
+    /**
+     * Get recent logs with optional filtering
+     */
+    get: (params?: {
+      limit?: number;
+      level?: string;
+      logger_filter?: string;
+      execution_id?: string;
+    }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.limit) searchParams.set('limit', params.limit.toString());
+      if (params?.level) searchParams.set('level', params.level);
+      if (params?.logger_filter) searchParams.set('logger_filter', params.logger_filter);
+      if (params?.execution_id) searchParams.set('execution_id', params.execution_id);
+      const query = searchParams.toString();
+      return fetchJSON<{
+        logs: Array<{
+          timestamp: string;
+          level: string;
+          logger: string;
+          message: string;
+          execution_id: string | null;
+        }>;
+        total: number;
+        filtered: number;
+      }>(`/api/logs${query ? `?${query}` : ''}`);
+    },
+
+    /**
+     * Get logs for a specific execution
+     */
+    getForExecution: (executionId: string, limit?: number) =>
+      fetchJSON<{
+        logs: Array<{
+          timestamp: string;
+          level: string;
+          logger: string;
+          message: string;
+          execution_id: string | null;
+        }>;
+        total: number;
+        filtered: number;
+      }>(`/api/logs/execution/${executionId}${limit ? `?limit=${limit}` : ''}`),
+
+    /**
+     * Get log statistics
+     */
+    getStats: () =>
+      fetchJSON<{
+        total_captured: number;
+        max_entries: number;
+        level_counts: Record<string, number>;
+        oldest_entry: string | null;
+        newest_entry: string | null;
+      }>('/api/logs/stats'),
+
+    /**
+     * Clear all captured logs
+     */
+    clear: () =>
+      fetchJSON<{ message: string; success: boolean }>('/api/logs', {
+        method: 'DELETE',
+      }),
+  },
+
+  /**
    * Get the base URL for API calls
    */
   getBaseUrl: () => API_BASE_URL,

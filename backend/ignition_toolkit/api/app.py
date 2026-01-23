@@ -33,6 +33,8 @@ from ignition_toolkit.api.routers.stackbuilder import router as stackbuilder_rou
 from ignition_toolkit.api.routers.clouddesigner import router as clouddesigner_router
 from ignition_toolkit.api.routers.updates import router as updates_router
 from ignition_toolkit.api.routers.websockets import router as websockets_router
+from ignition_toolkit.api.routers.logs import router as logs_router
+from ignition_toolkit.api.services.log_capture import setup_log_capture
 from ignition_toolkit.playbook.engine import PlaybookEngine
 from ignition_toolkit.playbook.metadata import PlaybookMetadataStore
 from ignition_toolkit.startup.lifecycle import lifespan
@@ -82,6 +84,13 @@ app.include_router(clouddesigner_router)
 
 # Register WebSocket router
 app.include_router(websockets_router)
+
+# Register Logs router (for UI log access)
+app.include_router(logs_router)
+
+# Initialize log capture for UI access
+setup_log_capture(max_entries=2000)
+logger.info("Log capture initialized for UI access")
 
 # ============================================================================
 # Middleware (order matters - applied in reverse order)

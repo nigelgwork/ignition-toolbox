@@ -35,6 +35,7 @@ import {
   BugReport as DebugIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
+  Terminal as LogsIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -53,6 +54,7 @@ export function ExecutionDetail() {
   const [debugModeToggling, setDebugModeToggling] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showCodeViewer, setShowCodeViewer] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
   const [runtime, setRuntime] = useState<string>('0s');
 
   // Fetch execution from API
@@ -61,6 +63,14 @@ export function ExecutionDetail() {
     queryFn: () => api.executions.get(executionId!),
     enabled: !!executionId,
     refetchInterval: 2000, // Refetch every 2 seconds as fallback
+  });
+
+  // Fetch logs for this execution
+  const { data: logsData, refetch: refetchLogs } = useQuery({
+    queryKey: ['logs', executionId],
+    queryFn: () => api.logs.getForExecution(executionId!, 500),
+    enabled: !!executionId && showLogs,
+    refetchInterval: showLogs ? 3000 : false, // Refetch every 3 seconds when visible
   });
 
   if (!executionId) {
@@ -322,6 +332,24 @@ export function ExecutionDetail() {
           </Tooltip>
         )}
 
+        {/* View Logs Button */}
+        <Tooltip title={showLogs ? "Hide backend logs" : "View backend logs for debugging"}>
+          <Button
+            variant={showLogs ? "contained" : "outlined"}
+            size="small"
+            startIcon={<LogsIcon />}
+            onClick={() => {
+              setShowLogs(!showLogs);
+              if (!showLogs) {
+                refetchLogs();
+              }
+            }}
+            color={showLogs ? "primary" : "inherit"}
+          >
+            Logs
+          </Button>
+        </Tooltip>
+
         <ExecutionControls
           executionId={executionId}
           status={execution.status}
@@ -361,6 +389,145 @@ export function ExecutionDetail() {
               credential validation, or gateway connection. Check the backend logs for more details.
             </Typography>
           </Alert>
+        </Box>
+      )}
+
+      {/* Backend Logs Panel */}
+      {showLogs && (
+        <Box sx={{ px: 2, py: 1, flexShrink: 0, maxHeight: '250px', overflow: 'hidden' }}>
+          <Paper
+            elevation={2}
+            sx={{
+              bgcolor: '#1a1a1a',
+              border: '1px solid #333',
+              borderRadius: 1,
+              overflow: 'hidden',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <Box
+              sx={{
+                px: 1.5,
+                py: 0.75,
+                bgcolor: '#252525',
+                borderBottom: '1px solid #333',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LogsIcon sx={{ fontSize: '1rem', color: '#00ff00' }} />
+                <Typography variant="subtitle2" sx={{ color: '#00ff00', fontFamily: 'monospace' }}>
+                  Backend Logs
+                </Typography>
+                {logsData && (
+                  <Chip
+                    label={`${logsData.filtered} entries`}
+                    size="small"
+                    sx={{
+                      height: '18px',
+                      fontSize: '0.65rem',
+                      bgcolor: '#333',
+                      color: '#888',
+                    }}
+                  />
+                )}
+              </Box>
+              <Button
+                size="small"
+                onClick={() => refetchLogs()}
+                sx={{ color: '#888', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
+              >
+                Refresh
+              </Button>
+            </Box>
+            <Box
+              sx={{
+                flex: 1,
+                overflow: 'auto',
+                p: 1,
+                fontFamily: 'monospace',
+                fontSize: '0.75rem',
+                lineHeight: 1.4,
+              }}
+            >
+              {logsData?.logs && logsData.logs.length > 0 ? (
+                logsData.logs.map((log, index) => (
+                  <Box
+                    key={index}
+                    sx={{
+                      py: 0.25,
+                      borderBottom: '1px solid #222',
+                      display: 'flex',
+                      gap: 1,
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
+                    }}
+                  >
+                    <Typography
+                      component="span"
+                      sx={{
+                        color: '#666',
+                        fontSize: '0.7rem',
+                        minWidth: '80px',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </Typography>
+                    <Typography
+                      component="span"
+                      sx={{
+                        fontWeight: 'bold',
+                        minWidth: '55px',
+                        flexShrink: 0,
+                        color:
+                          log.level === 'ERROR'
+                            ? '#ff4444'
+                            : log.level === 'WARNING'
+                            ? '#ffaa00'
+                            : log.level === 'DEBUG'
+                            ? '#888'
+                            : '#00cc00',
+                      }}
+                    >
+                      {log.level}
+                    </Typography>
+                    <Typography
+                      component="span"
+                      sx={{
+                        color: '#888',
+                        minWidth: '150px',
+                        maxWidth: '200px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {log.logger}
+                    </Typography>
+                    <Typography
+                      component="span"
+                      sx={{
+                        color: '#ccc',
+                        flex: 1,
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {log.message}
+                    </Typography>
+                  </Box>
+                ))
+              ) : (
+                <Typography sx={{ color: '#666', fontStyle: 'italic' }}>
+                  No logs captured for this execution yet.
+                </Typography>
+              )}
+            </Box>
+          </Paper>
         </Box>
       )}
 
