@@ -199,19 +199,19 @@ class StackRunner:
         try:
             # Write compose file
             compose_path = stack_dir / "docker-compose.yml"
-            compose_path.write_text(compose_content)
+            compose_path.write_text(compose_content, encoding='utf-8')
 
             # Write env file
             if env_content:
                 env_path = stack_dir / ".env"
-                env_path.write_text(env_content)
+                env_path.write_text(env_content, encoding='utf-8')
 
             # Write additional config files
             if config_files:
                 for file_path, content in config_files.items():
                     full_path = stack_dir / file_path
                     full_path.parent.mkdir(parents=True, exist_ok=True)
-                    full_path.write_text(content)
+                    full_path.write_text(content, encoding='utf-8')
 
             # Run docker compose up
             logger.info(f"Deploying stack '{stack_name}' from {stack_dir}")

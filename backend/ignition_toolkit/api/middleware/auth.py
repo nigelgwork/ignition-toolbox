@@ -43,7 +43,7 @@ def get_or_generate_api_key() -> str:
     # Try to load existing key from file
     if api_key_file.exists():
         try:
-            api_key = api_key_file.read_text().strip()
+            api_key = api_key_file.read_text(encoding='utf-8').strip()
             if api_key:
                 return api_key
         except Exception:
@@ -55,7 +55,7 @@ def get_or_generate_api_key() -> str:
     # Save to file with restricted permissions
     try:
         api_key_file.parent.mkdir(parents=True, exist_ok=True)
-        api_key_file.write_text(api_key)
+        api_key_file.write_text(api_key, encoding='utf-8')
         api_key_file.chmod(0o600)  # Owner read/write only
     except Exception as e:
         # Log warning but continue (key still works from memory)
