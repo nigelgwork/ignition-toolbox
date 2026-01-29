@@ -59,6 +59,45 @@ function createWindow(): void {
 async function startPythonBackend(): Promise<void> {
   pythonBackend = new PythonBackend();
 
+  // Set up crash handler for when backend dies after startup
+  pythonBackend.onCrash((crashInfo) => {
+    console.error('[Main] Backend crashed after all restart attempts:', crashInfo);
+
+    // Extract useful error info for the user
+    let errorDetails = `The backend process crashed and could not be restarted.\n\n`;
+    errorDetails += `Exit code: ${crashInfo.exitCode}\n`;
+    errorDetails += `Restart attempts: ${crashInfo.restartAttempt + 1}/3\n\n`;
+
+    if (crashInfo.stderr) {
+      const lastError = crashInfo.stderr.split('\n').filter(l => l.trim()).slice(-5).join('\n');
+      errorDetails += `Last errors:\n${lastError}\n\n`;
+    }
+
+    errorDetails += `Possible solutions:\n`;
+    errorDetails += `• Check if antivirus is blocking the application\n`;
+    errorDetails += `• Try running as Administrator\n`;
+    errorDetails += `• Reinstall the application\n`;
+    errorDetails += `• Check %APPDATA%\\ignition-toolbox\\logs\\ for details`;
+
+    dialog.showMessageBox(mainWindow!, {
+      type: 'error',
+      title: 'Backend Crashed',
+      message: 'The backend process has stopped unexpectedly.',
+      detail: errorDetails,
+      buttons: ['Restart Application', 'Continue Anyway', 'Quit'],
+    }).then((result) => {
+      if (result.response === 0) {
+        // Restart Application
+        app.relaunch();
+        app.quit();
+      } else if (result.response === 2) {
+        // Quit
+        app.quit();
+      }
+      // Continue Anyway - do nothing, let user see the broken state
+    });
+  });
+
   try {
     await pythonBackend.start();
     console.log(`Python backend started on port ${pythonBackend.getPort()}`);

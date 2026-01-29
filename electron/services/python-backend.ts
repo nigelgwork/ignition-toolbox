@@ -10,6 +10,17 @@ export interface BackendStatus {
   pid: number | null;
 }
 
+export interface BackendCrashInfo {
+  exitCode: number | null;
+  stderr: string;
+  stdout: string;
+  hadStarted: boolean;
+  restartAttempt: number;
+  timestamp: string;
+}
+
+export type BackendCrashCallback = (crashInfo: BackendCrashInfo) => void;
+
 export class PythonBackend {
   private process: ChildProcess | null = null;
   private port: number | null = null;
@@ -17,6 +28,23 @@ export class PythonBackend {
   private restartCount = 0;
   private maxRestarts = 3;
   private isShuttingDown = false;
+  private onCrashCallback: BackendCrashCallback | null = null;
+
+  /**
+   * Set a callback to be called when the backend crashes after all restart attempts
+   */
+  onCrash(callback: BackendCrashCallback): void {
+    this.onCrashCallback = callback;
+  }
+
+  /**
+   * Emit a backend crash event
+   */
+  private emitBackendCrash(crashInfo: BackendCrashInfo): void {
+    if (this.onCrashCallback) {
+      this.onCrashCallback(crashInfo);
+    }
+  }
 
   /**
    * Find a free port for the backend server
@@ -253,6 +281,18 @@ export class PythonBackend {
       // Handle process exit
       this.process.on('close', (code) => {
         console.log(`Python backend exited with code ${code}`);
+
+        // Capture crash info for diagnostics
+        const crashInfo = {
+          exitCode: code,
+          stderr: stderrBuffer.slice(-2000),
+          stdout: stdoutBuffer.slice(-2000),
+          hadStarted: started,
+          restartAttempt: this.restartCount,
+          timestamp: new Date().toISOString(),
+        };
+        console.log('[Backend] Crash info:', JSON.stringify(crashInfo, null, 2));
+
         this.process = null;
 
         if (!started) {
@@ -270,6 +310,12 @@ export class PythonBackend {
           console.log(`Attempting to restart backend (attempt ${this.restartCount + 1}/${this.maxRestarts})`);
           this.restartCount++;
           setTimeout(() => this.start(), 1000);
+        } else if (!this.isShuttingDown) {
+          // All restart attempts failed - emit an error event for the main process
+          console.error('[Backend] CRITICAL: All restart attempts failed. Backend is not running.');
+          console.error('[Backend] Last crash info:', crashInfo);
+          // Emit a custom event that main.ts can listen for
+          this.emitBackendCrash(crashInfo);
         }
       });
 
