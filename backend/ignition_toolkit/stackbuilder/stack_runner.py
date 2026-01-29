@@ -222,6 +222,8 @@ class StackRunner:
                 cwd=stack_dir,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=300,  # 5 minute timeout for pulling images
                 creationflags=_CREATION_FLAGS,
             )
@@ -289,6 +291,8 @@ class StackRunner:
                 cwd=stack_dir,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=120,
                 creationflags=_CREATION_FLAGS,
             )
@@ -351,6 +355,8 @@ class StackRunner:
                 cwd=stack_dir,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=30,
                 creationflags=_CREATION_FLAGS,
             )

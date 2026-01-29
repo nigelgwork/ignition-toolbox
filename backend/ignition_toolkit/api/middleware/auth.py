@@ -152,7 +152,7 @@ def print_api_key_info():
     """
     if not is_auth_required():
         print("\n" + "=" * 70)
-        print("⚠️  API AUTHENTICATION DISABLED")
+        print("[WARN] API AUTHENTICATION DISABLED")
         print("=" * 70)
         print("Authentication is disabled (DISABLE_API_AUTH=true)")
         print("This is ONLY safe for localhost-only deployments!")
@@ -167,7 +167,7 @@ def print_api_key_info():
 
         api_key_file = _get_api_key_file()
         print("\n" + "=" * 70)
-        print("🔒 API AUTHENTICATION ENABLED")
+        print("[AUTH] API AUTHENTICATION ENABLED")
         print("=" * 70)
         print(f"API Key: {redacted_key} (redacted for security)")
         print(f"Stored in: {api_key_file}")
@@ -178,6 +178,6 @@ def print_api_key_info():
         print("Example:")
         print(f'  curl -H "X-API-Key: <your-key>" http://localhost:5000/api/playbooks')
         print("")
-        print("📖 To view full API key:")
+        print("To view full API key:")
         print(f"  cat {api_key_file}")
         print("=" * 70 + "\n")
