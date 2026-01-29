@@ -107,6 +107,8 @@ def _check_wsl_docker() -> tuple[bool, str | None]:
                 test_cmd,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=30,  # Longer timeout for WSL startup
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
@@ -157,6 +159,8 @@ def _check_wsl_docker_running() -> bool:
                 cmd,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=30,
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
@@ -188,6 +192,8 @@ def _check_wsl_docker_running() -> bool:
                 cmd,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=30,
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
@@ -379,6 +385,8 @@ class CloudDesignerManager:
                 docker_cmd + ["--version"],
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=30,  # Longer timeout for WSL startup
                 creationflags=_CREATION_FLAGS,
             )
@@ -401,6 +409,8 @@ class CloudDesignerManager:
                 docker_cmd + ["info"],
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=45,  # Longer timeout for WSL2 startup
                 creationflags=_CREATION_FLAGS,
             )
@@ -422,6 +432,8 @@ class CloudDesignerManager:
                 docker_cmd + ["--version"],
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=30,  # Longer timeout for WSL
                 creationflags=_CREATION_FLAGS,
             )
@@ -473,6 +485,8 @@ class CloudDesignerManager:
                 ],
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=15,
                 creationflags=_CREATION_FLAGS,
             )
@@ -542,6 +556,8 @@ class CloudDesignerManager:
                 env=env,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',  # Handle encoding errors gracefully
                 timeout=120,  # 2 minute timeout for pulling images
                 creationflags=_CREATION_FLAGS,
             )
@@ -599,6 +615,8 @@ class CloudDesignerManager:
                 cwd=self.compose_dir,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=60,
                 creationflags=_CREATION_FLAGS,
             )
