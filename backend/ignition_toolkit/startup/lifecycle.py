@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
     start_time = datetime.utcnow()
 
     logger.info("=" * 60)
-    logger.info("🚀 Ignition Automation Toolkit - Startup")
+    logger.info("Ignition Automation Toolkit - Startup")
     logger.info("=" * 60)
 
     try:
@@ -58,9 +58,9 @@ async def lifespan(app: FastAPI):
         logger.info("Phase 1/8: Environment Validation")
         try:
             await validate_environment()
-            logger.info("✅ Environment validated")
+            logger.info("[OK] Environment validated")
         except StartupError as e:
-            logger.error(f"❌ {e}")
+            logger.error(f"[ERROR] {e}")
             set_component_unhealthy("environment", str(e))
             raise
 
@@ -69,9 +69,9 @@ async def lifespan(app: FastAPI):
         try:
             await initialize_database()
             set_component_healthy("database", "Database operational")
-            logger.info("✅ Database initialized")
+            logger.info("[OK] Database initialized")
         except StartupError as e:
-            logger.error(f"❌ {e}")
+            logger.error(f"[ERROR] {e}")
             set_component_unhealthy("database", str(e))
             raise
 
@@ -80,9 +80,9 @@ async def lifespan(app: FastAPI):
         try:
             await initialize_vault()
             set_component_healthy("vault", "Vault operational")
-            logger.info("✅ Credential vault initialized")
+            logger.info("[OK] Credential vault initialized")
         except StartupError as e:
-            logger.error(f"❌ {e}")
+            logger.error(f"[ERROR] {e}")
             set_component_unhealthy("vault", str(e))
             raise
 
@@ -91,9 +91,9 @@ async def lifespan(app: FastAPI):
         try:
             stats = await validate_playbooks()
             set_component_healthy("playbooks", f"Found {stats['total']} playbooks")
-            logger.info("✅ Playbook library validated")
+            logger.info("[OK] Playbook library validated")
         except Exception as e:
-            logger.warning(f"⚠️  Playbook validation failed: {e}")
+            logger.warning(f"[WARN]  Playbook validation failed: {e}")
             set_component_degraded("playbooks", str(e))
 
         # Phase 5: Playwright Browser (NON-FATAL but required for playbook execution)
@@ -108,14 +108,14 @@ async def lifespan(app: FastAPI):
 
             if is_browser_installed():
                 set_component_healthy("browser", "Chromium browser ready")
-                logger.info("✅ Playwright browser ready")
+                logger.info("[OK] Playwright browser ready")
             else:
                 # Browser not found - this shouldn't happen with bundled installer
                 set_component_degraded("browser", "Browser not found - playbooks may not work")
-                logger.warning("⚠️  Playwright browser not found. Playbooks requiring a browser will fail.")
+                logger.warning("[WARN]  Playwright browser not found. Playbooks requiring a browser will fail.")
                 logger.warning(f"   Expected browser location: {browsers_path}")
         except Exception as e:
-            logger.warning(f"⚠️  Browser check failed: {e}")
+            logger.warning(f"[WARN]  Browser check failed: {e}")
             set_component_degraded("browser", str(e))
 
         # Phase 6: Frontend Build (NON-FATAL, production only)
@@ -124,9 +124,9 @@ async def lifespan(app: FastAPI):
             try:
                 await validate_frontend()
                 set_component_healthy("frontend", "Frontend build verified")
-                logger.info("✅ Frontend validated")
+                logger.info("[OK] Frontend validated")
             except Exception as e:
-                logger.warning(f"⚠️  Frontend validation failed: {e}")
+                logger.warning(f"[WARN]  Frontend validation failed: {e}")
                 set_component_degraded("frontend", str(e))
         else:
             logger.info("Phase 6/8: Frontend Validation (SKIPPED - dev mode)")
@@ -140,9 +140,9 @@ async def lifespan(app: FastAPI):
             scheduler = get_scheduler()
             await scheduler.start()
             set_component_healthy("scheduler", "Scheduler running")
-            logger.info("✅ Playbook scheduler started")
+            logger.info("[OK] Playbook scheduler started")
         except Exception as e:
-            logger.warning(f"⚠️  Scheduler startup failed: {e}")
+            logger.warning(f"[WARN]  Scheduler startup failed: {e}")
             set_component_degraded("scheduler", str(e))
 
         # Phase 8: Initialize Application Services
@@ -153,9 +153,9 @@ async def lifespan(app: FastAPI):
             services = AppServices.create(ttl_minutes=30)
             app.state.services = services
             set_component_healthy("services", "Application services initialized")
-            logger.info("✅ Application services initialized")
+            logger.info("[OK] Application services initialized")
         except Exception as e:
-            logger.error(f"❌ Failed to initialize services: {e}")
+            logger.error(f"[ERROR] Failed to initialize services: {e}")
             set_component_unhealthy("services", str(e))
             raise
 
@@ -174,7 +174,7 @@ async def lifespan(app: FastAPI):
         # Startup summary
         elapsed = (datetime.utcnow() - start_time).total_seconds()
         logger.info("=" * 60)
-        logger.info(f"✅ System Ready (Startup time: {elapsed:.2f}s)")
+        logger.info(f"[OK] System Ready (Startup time: {elapsed:.2f}s)")
         logger.info(f"   Overall Status: {health.overall.value.upper()}")
         logger.info(f"   Database: {health.database.status.value}")
         logger.info(f"   Vault: {health.vault.status.value}")
@@ -194,7 +194,7 @@ async def lifespan(app: FastAPI):
 
     except StartupError as e:
         logger.error("=" * 60)
-        logger.error(f"❌ Startup failed: {e}")
+        logger.error(f"[ERROR] Startup failed: {e}")
         logger.error("=" * 60)
         health.overall = HealthStatus.UNHEALTHY
         health.ready = False
@@ -202,7 +202,7 @@ async def lifespan(app: FastAPI):
 
     except Exception as e:
         logger.error("=" * 60)
-        logger.error(f"❌ Unexpected startup error: {e}", exc_info=True)
+        logger.error(f"[ERROR] Unexpected startup error: {e}", exc_info=True)
         logger.error("=" * 60)
         health.overall = HealthStatus.UNHEALTHY
         health.ready = False
@@ -210,15 +210,15 @@ async def lifespan(app: FastAPI):
 
     finally:
         # Shutdown cleanup
-        logger.info("🛑 Shutting down...")
+        logger.info("[STOP] Shutting down...")
 
         # Cleanup application services
         try:
             if hasattr(app.state, "services"):
                 await app.state.services.cleanup()
-                logger.info("✅ Application services cleaned up")
+                logger.info("[OK] Application services cleaned up")
         except Exception as e:
-            logger.warning(f"⚠️  Service cleanup warning: {e}")
+            logger.warning(f"[WARN]  Service cleanup warning: {e}")
 
         # Stop scheduler
         try:
@@ -226,8 +226,8 @@ async def lifespan(app: FastAPI):
 
             scheduler = get_scheduler()
             await scheduler.stop()
-            logger.info("✅ Scheduler stopped")
+            logger.info("[OK] Scheduler stopped")
         except Exception as e:
-            logger.warning(f"⚠️  Scheduler shutdown warning: {e}")
+            logger.warning(f"[WARN]  Scheduler shutdown warning: {e}")
 
-        logger.info("✅ Shutdown complete")
+        logger.info("[OK] Shutdown complete")

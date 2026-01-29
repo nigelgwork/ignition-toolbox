@@ -66,7 +66,7 @@ class AppServices:
             state_update_callback=websocket_manager.broadcast_execution_state,
         )
 
-        logger.info("✅ Application services initialized")
+        logger.info("[OK] Application services initialized")
 
         return cls(
             execution_manager=execution_manager,
@@ -89,4 +89,4 @@ class AppServices:
         # Close all WebSocket connections
         await self.websocket_manager.close_all()
 
-        logger.info("✅ Application services cleaned up")
+        logger.info("[OK] Application services cleaned up")

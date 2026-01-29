@@ -117,7 +117,7 @@ class WebSocketManager:
         status_value = state.status.value if hasattr(state.status, 'value') else state.status
         if len(self._connections) == 0 and status_value in ["cancelled", "failed"]:
             logger.warning(
-                f"⚠️  CRITICAL: Broadcasting {status_value} status but NO WebSocket "
+                f"[WARN]  CRITICAL: Broadcasting {status_value} status but NO WebSocket "
                 f"connections active! Frontend will miss real-time update for execution {state.execution_id}"
             )
 

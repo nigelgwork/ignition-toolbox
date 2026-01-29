@@ -46,7 +46,7 @@ async def validate_environment() -> None:
             f"Python 3.10+ required, found {sys.version}",
             recovery_hint="Upgrade Python: https://www.python.org/downloads/",
         )
-    logger.info(f"✓ Python version: {sys.version_info.major}.{sys.version_info.minor}")
+    logger.info(f"[OK] Python version: {sys.version_info.major}.{sys.version_info.minor}")
 
     # Check/create data directory
     settings = get_settings()
@@ -55,7 +55,7 @@ async def validate_environment() -> None:
     if not data_dir.exists():
         try:
             data_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"✓ Created data directory: {data_dir.absolute()}")
+            logger.info(f"[OK] Created data directory: {data_dir.absolute()}")
         except Exception as e:
             raise EnvironmentError(
                 f"Cannot create data directory: {e}", recovery_hint="Check filesystem permissions"
@@ -66,20 +66,20 @@ async def validate_environment() -> None:
             f"Data directory not writable: {data_dir.absolute()}",
             recovery_hint=f"Fix permissions: chmod u+w {data_dir}",
         )
-    logger.info(f"✓ Data directory writable: {data_dir.absolute()}")
+    logger.info(f"[OK] Data directory writable: {data_dir.absolute()}")
 
     # Check/create toolkit directory
     toolkit_dir = settings.vault_path.parent
     if not toolkit_dir.exists():
         try:
             toolkit_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"✓ Created toolkit directory: {toolkit_dir}")
+            logger.info(f"[OK] Created toolkit directory: {toolkit_dir}")
         except Exception as e:
             raise EnvironmentError(
                 f"Cannot create toolkit directory: {e}",
                 recovery_hint="Check home directory permissions",
             )
-    logger.info(f"✓ Toolkit directory: {toolkit_dir}")
+    logger.info(f"[OK] Toolkit directory: {toolkit_dir}")
 
 
 async def initialize_database() -> None:
@@ -99,7 +99,7 @@ async def initialize_database() -> None:
 
         # Create all tables (idempotent)
         db.create_tables()
-        logger.info("✓ Database tables created/verified")
+        logger.info("[OK] Database tables created/verified")
 
         # Test query
         with db.session_scope() as session:
@@ -107,7 +107,7 @@ async def initialize_database() -> None:
             if result[0] != 1:
                 raise DatabaseInitError("Database test query failed")
 
-        logger.info(f"✓ Database operational: {db.database_path}")
+        logger.info(f"[OK] Database operational: {db.database_path}")
 
     except Exception as e:
         if isinstance(e, DatabaseInitError):
@@ -139,7 +139,7 @@ async def initialize_vault() -> None:
         if not vault.test_encryption():
             raise VaultInitError("Vault encryption test failed")
 
-        logger.info(f"✓ Credential vault operational: {vault.vault_path}")
+        logger.info(f"[OK] Credential vault operational: {vault.vault_path}")
 
     except Exception as e:
         if isinstance(e, VaultInitError):
@@ -188,7 +188,7 @@ async def validate_playbooks() -> dict:
     total = len(gateway_playbooks) + len(perspective_playbooks) + len(example_playbooks)
 
     logger.info(
-        f"✓ Found {total} playbooks "
+        f"[OK] Found {total} playbooks "
         f"({len(gateway_playbooks)} gateway, {len(perspective_playbooks)} perspective, "
         f"{len(example_playbooks)} examples)"
     )
@@ -199,9 +199,9 @@ async def validate_playbooks() -> dict:
 
         metadata_store = PlaybookMetadataStore()
         metadata_store.auto_detect_built_ins(playbooks_dir)
-        logger.info("✓ Auto-detected built-in playbooks")
+        logger.info("[OK] Auto-detected built-in playbooks")
     except Exception as e:
-        logger.warning(f"⚠️  Failed to auto-detect built-in playbooks: {e}")
+        logger.warning(f"[WARN]  Failed to auto-detect built-in playbooks: {e}")
 
     return {
         "total": total,
@@ -232,4 +232,4 @@ async def validate_frontend() -> None:
     if not index_file.exists():
         raise Exception(f"Frontend index.html not found: {index_file.absolute()}")
 
-    logger.info(f"✓ Frontend build verified: {frontend_dir.absolute()}")
+    logger.info(f"[OK] Frontend build verified: {frontend_dir.absolute()}")
