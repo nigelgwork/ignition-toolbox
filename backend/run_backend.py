@@ -9,6 +9,13 @@ It's designed to be spawned by the Electron main process.
 import os
 import sys
 import logging
+import traceback
+
+# Force UTF-8 encoding for stdout/stderr on Windows
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Configure logging
 logging.basicConfig(
@@ -18,6 +25,26 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def global_exception_handler(exc_type, exc_value, exc_tb):
+    """Global exception handler to log unhandled exceptions before crash."""
+    logger.error("=" * 60)
+    logger.error("UNHANDLED EXCEPTION - Backend is crashing!")
+    logger.error("=" * 60)
+    logger.error(f"Type: {exc_type.__name__}")
+    logger.error(f"Value: {exc_value}")
+    logger.error("Traceback:")
+    for line in traceback.format_tb(exc_tb):
+        for subline in line.strip().split('\n'):
+            logger.error(f"  {subline}")
+    logger.error("=" * 60)
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+
+# Install global exception handler
+sys.excepthook = global_exception_handler
 
 
 def main():
