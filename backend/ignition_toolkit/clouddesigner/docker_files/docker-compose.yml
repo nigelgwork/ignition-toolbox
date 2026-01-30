@@ -46,8 +46,6 @@ services:
       GUACD_HOSTNAME: guacd
       GUACD_PORT: 4822
       GUACAMOLE_HOME: /etc/guacamole
-      # Enable header authentication for auto-login
-      HTTP_AUTH_ENABLED: "true"
     networks:
       clouddesigner-net:
         ipv4_address: 10.100.0.3
