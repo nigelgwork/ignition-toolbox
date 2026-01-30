@@ -38,10 +38,10 @@ def _is_wsl() -> bool:
         return False
 
     try:
-        with open("/proc/version", "r") as f:
+        with open("/proc/version", "r", encoding="utf-8", errors="replace") as f:
             version_info = f.read().lower()
             return "microsoft" in version_info or "wsl" in version_info
-    except (FileNotFoundError, PermissionError):
+    except Exception:
         return False
 
 
@@ -110,7 +110,7 @@ def _check_wsl_docker() -> tuple[bool, str | None]:
                 encoding='utf-8',
                 errors='replace',
                 timeout=30,  # Longer timeout for WSL startup
-                creationflags=subprocess.CREATE_NO_WINDOW,
+                creationflags=_CREATION_FLAGS,
             )
             logger.info(f"WSL Docker result: returncode={result.returncode}, stdout={result.stdout[:100] if result.stdout else ''}, stderr={result.stderr[:100] if result.stderr else ''}")
             if result.returncode == 0:
@@ -131,6 +131,8 @@ def _check_wsl_docker() -> tuple[bool, str | None]:
             logger.info(f"WSL Docker command timed out: {test_cmd}")
         except OSError as e:
             logger.info(f"WSL Docker check error: {e}")
+        except Exception as e:
+            logger.exception(f"Unexpected error checking WSL Docker: {e}")
 
     logger.info("All WSL Docker detection methods failed")
     return False, None
@@ -162,7 +164,7 @@ def _check_wsl_docker_running() -> bool:
                 encoding='utf-8',
                 errors='replace',
                 timeout=30,
-                creationflags=subprocess.CREATE_NO_WINDOW,
+                creationflags=_CREATION_FLAGS,
             )
             if result.returncode == 0:
                 logger.info(f"WSL Docker daemon running via cached command")
@@ -171,6 +173,8 @@ def _check_wsl_docker_running() -> bool:
                 logger.info(f"WSL Docker daemon not running: {result.stderr[:100] if result.stderr else 'no error'}")
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
             logger.debug(f"WSL Docker daemon check failed: {e}")
+        except Exception as e:
+            logger.exception(f"Unexpected error checking WSL Docker daemon: {e}")
 
     # Fallback: try multiple approaches including specific distros and sudo
     wsl_commands = [
@@ -195,13 +199,15 @@ def _check_wsl_docker_running() -> bool:
                 encoding='utf-8',
                 errors='replace',
                 timeout=30,
-                creationflags=subprocess.CREATE_NO_WINDOW,
+                creationflags=_CREATION_FLAGS,
             )
             if result.returncode == 0:
                 logger.info(f"WSL Docker daemon running via: {' '.join(cmd)}")
                 return True
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
             logger.debug(f"WSL Docker daemon check failed for {cmd}: {e}")
+        except Exception as e:
+            logger.exception(f"Unexpected error checking WSL Docker daemon for {cmd}: {e}")
 
     return False
 
@@ -286,12 +292,14 @@ def _find_docker_executable() -> str | None:
 
         # Check if Docker is available via WSL
         logger.info("Docker Desktop not found, checking WSL...")
-        wsl_available, wsl_version = _check_wsl_docker()
-        if wsl_available:
-            logger.info(f"Using Docker via WSL: {wsl_version}")
-            return "wsl docker"  # Special marker for WSL Docker
-
-        logger.info("Docker not found via WSL either")
+        try:
+            wsl_available, wsl_version = _check_wsl_docker()
+            if wsl_available:
+                logger.info(f"Using Docker via WSL: {wsl_version}")
+                return "wsl docker"  # Special marker for WSL Docker
+            logger.info("Docker not found via WSL either")
+        except Exception as e:
+            logger.exception(f"Error checking WSL Docker: {e}")
 
     logger.info("Docker executable not found anywhere")
     return None
@@ -551,14 +559,14 @@ class CloudDesignerManager:
             docker_cmd = _get_docker_command()
 
             result = subprocess.run(
-                docker_cmd + ["compose", "up", "-d"],
+                docker_cmd + ["compose", "up", "-d", "--build"],
                 cwd=self.compose_dir,
                 env=env,
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
                 errors='replace',  # Handle encoding errors gracefully
-                timeout=120,  # 2 minute timeout for pulling images
+                timeout=1200,  # 20 minute timeout for first-time image build
                 creationflags=_CREATION_FLAGS,
             )
 
@@ -579,7 +587,7 @@ class CloudDesignerManager:
         except subprocess.TimeoutExpired:
             return {
                 "success": False,
-                "error": "Docker compose command timed out (may still be pulling images)",
+                "error": "Docker compose timed out after 20 minutes. The image may still be building - check 'docker ps' or try again.",
             }
         except FileNotFoundError:
             return {

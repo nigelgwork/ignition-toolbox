@@ -5,6 +5,7 @@ Provides endpoints for managing the browser-accessible Ignition Designer
 Docker stack.
 """
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException
@@ -92,7 +93,8 @@ async def get_docker_status():
     """
     try:
         manager = get_clouddesigner_manager()
-        status = manager.get_docker_status()
+        # Run in thread to avoid blocking the event loop during subprocess calls
+        status = await asyncio.to_thread(manager.get_docker_status)
 
         return DockerStatusResponse(
             installed=status.installed,
@@ -115,7 +117,8 @@ async def get_status():
     """
     try:
         manager = get_clouddesigner_manager()
-        status = manager.get_container_status()
+        # Run in thread to avoid blocking the event loop during subprocess calls
+        status = await asyncio.to_thread(manager.get_container_status)
 
         return CloudDesignerStatusResponse(
             status=status.status,
@@ -141,8 +144,8 @@ async def start_clouddesigner(request: StartRequest):
     try:
         manager = get_clouddesigner_manager()
 
-        # Check Docker first
-        docker_status = manager.get_docker_status()
+        # Check Docker first (run in thread to avoid blocking event loop)
+        docker_status = await asyncio.to_thread(manager.get_docker_status)
         if not docker_status.installed:
             return StartResponse(
                 success=False,
@@ -154,8 +157,10 @@ async def start_clouddesigner(request: StartRequest):
                 error="Docker is not running. Please start Docker Desktop.",
             )
 
-        # Start the stack
-        result = manager.start(
+        # Start the stack in a thread to avoid blocking the event loop
+        # This allows health checks to continue responding during long Docker operations
+        result = await asyncio.to_thread(
+            manager.start,
             gateway_url=request.gateway_url,
             credential_name=request.credential_name,
         )
@@ -180,7 +185,8 @@ async def stop_clouddesigner():
     """
     try:
         manager = get_clouddesigner_manager()
-        result = manager.stop()
+        # Run in thread to avoid blocking the event loop
+        result = await asyncio.to_thread(manager.stop)
 
         return StopResponse(
             success=result["success"],
