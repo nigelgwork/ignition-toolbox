@@ -49,6 +49,7 @@ services:
     networks:
       clouddesigner-net:
         ipv4_address: 10.100.0.3
+    user: root
     volumes:
       - ./guacamole/guacamole.properties:/etc/guacamole/guacamole.properties
       - ./guacamole/user-mapping.xml:/etc/guacamole/user-mapping.xml
