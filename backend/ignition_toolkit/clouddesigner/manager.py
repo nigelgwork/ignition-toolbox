@@ -573,8 +573,50 @@ class CloudDesignerManager:
             logger.info(f"Starting CloudDesigner stack with gateway: {gateway_url}")
             docker_cmd = _get_docker_command()
 
+            # First, clean up any existing containers and volumes to avoid stale state
+            logger.info("Cleaning up existing containers and volumes...")
+            subprocess.run(
+                docker_cmd + ["compose", "down", "-v"],
+                cwd=self.compose_dir,
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=60,
+                creationflags=_CREATION_FLAGS,
+            )
+
+            # Remove guacamole image to clear any cached state from HTTP_AUTH_ENABLED
+            logger.info("Removing guacamole image to ensure fresh state...")
+            subprocess.run(
+                docker_cmd + ["rmi", "guacamole/guacamole:1.5.4"],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=30,
+                creationflags=_CREATION_FLAGS,
+            )
+
+            # Use --no-cache to ensure designer-desktop is built fresh
             result = subprocess.run(
-                docker_cmd + ["compose", "up", "-d", "--build"],
+                docker_cmd + ["compose", "build", "--no-cache", "designer-desktop"],
+                cwd=self.compose_dir,
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=600,  # 10 minute timeout for build
+                creationflags=_CREATION_FLAGS,
+            )
+
+            if result.returncode != 0:
+                logger.warning(f"Designer-desktop build warning: {result.stderr}")
+
+            result = subprocess.run(
+                docker_cmd + ["compose", "up", "-d"],
                 cwd=self.compose_dir,
                 env=env,
                 capture_output=True,
