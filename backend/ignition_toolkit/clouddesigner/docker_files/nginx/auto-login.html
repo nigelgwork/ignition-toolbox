@@ -69,14 +69,16 @@
 
                 if (!connId) throw new Error('No connections configured');
 
-                status.textContent = 'Login successful! Redirecting...';
+                status.textContent = 'Login successful! Connecting to Designer...';
 
                 // Store auth token for Guacamole app
                 sessionStorage.setItem('GUAC_AUTH_TOKEN', token);
                 localStorage.setItem('GUAC_AUTH_TOKEN', token);
 
-                // Redirect to home - user clicks connection once
-                window.location.href = '/#/?token=' + token;
+                // Auto-connect to the first connection (Ignition Designer)
+                // URL format: /#/client/{encoded-connection-id}?token=...
+                const encodedConnId = btoa('c/' + connId);
+                window.location.href = '/#/client/' + encodedConnId + '?token=' + token;
 
             } catch (e) {
                 console.error(e);

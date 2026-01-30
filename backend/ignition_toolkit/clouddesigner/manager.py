@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from ignition_toolkit.credentials.vault import get_credential_vault
+
 logger = logging.getLogger(__name__)
 
 # Windows-specific subprocess flag to hide console window
@@ -551,8 +553,21 @@ class CloudDesignerManager:
         # Prepare environment
         env = os.environ.copy()
         env["IGNITION_GATEWAY_URL"] = gateway_url
+
+        # Fetch credentials from vault if credential_name is provided
         if credential_name:
             env["IGNITION_CREDENTIAL_NAME"] = credential_name
+            try:
+                vault = get_credential_vault()
+                credential = vault.get_credential(credential_name)
+                if credential:
+                    env["IGNITION_USERNAME"] = credential.username
+                    env["IGNITION_PASSWORD"] = credential.password
+                    logger.info(f"Loaded credentials for '{credential_name}' (user: {credential.username})")
+                else:
+                    logger.warning(f"Credential '{credential_name}' not found in vault")
+            except Exception as e:
+                logger.warning(f"Failed to load credentials: {e}")
 
         try:
             logger.info(f"Starting CloudDesigner stack with gateway: {gateway_url}")
