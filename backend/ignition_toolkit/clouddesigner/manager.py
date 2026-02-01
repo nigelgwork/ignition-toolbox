@@ -332,6 +332,34 @@ def _get_docker_command() -> list[str]:
     return ["docker"]
 
 
+def _is_using_wsl_docker() -> bool:
+    """Check if we're using Docker via WSL."""
+    docker_path = _find_docker_executable()
+    return docker_path == "wsl docker"
+
+
+def _windows_to_wsl_path(windows_path: Path | str) -> str:
+    """
+    Convert a Windows path to a WSL path.
+
+    Example: C:\\Users\\name\\folder -> /mnt/c/Users/name/folder
+    """
+    path_str = str(windows_path)
+
+    # Handle UNC paths or already-unix paths
+    if path_str.startswith("/"):
+        return path_str
+
+    # Convert drive letter (e.g., C: -> /mnt/c)
+    if len(path_str) >= 2 and path_str[1] == ":":
+        drive = path_str[0].lower()
+        rest = path_str[2:].replace("\\", "/")
+        return f"/mnt/{drive}{rest}"
+
+    # Just convert backslashes
+    return path_str.replace("\\", "/")
+
+
 def _get_docker_files_path() -> Path:
     """
     Get the path to the Docker files directory.
@@ -582,11 +610,25 @@ class CloudDesignerManager:
             docker_cmd = _get_docker_command()
             logger.info(f"[Docker CloudDesigner] Using docker command: {docker_cmd}")
 
+            # Determine if we need WSL path conversion
+            use_wsl = _is_using_wsl_docker()
+            compose_file = self.compose_dir / "docker-compose.yml"
+
+            if use_wsl:
+                # Convert Windows path to WSL path for docker compose -f flag
+                wsl_compose_file = _windows_to_wsl_path(compose_file)
+                compose_args = ["compose", "-f", wsl_compose_file]
+                run_cwd = None  # Don't use cwd with WSL
+                logger.info(f"[Docker CloudDesigner] Using WSL compose file: {wsl_compose_file}")
+            else:
+                compose_args = ["compose"]
+                run_cwd = self.compose_dir
+
             # First, clean up any existing containers and volumes to avoid stale state
             logger.info("[Docker CloudDesigner] Step 1/4: Cleaning up existing containers and volumes...")
             cleanup_result = subprocess.run(
-                docker_cmd + ["compose", "down", "-v"],
-                cwd=self.compose_dir,
+                docker_cmd + compose_args + ["down", "-v"],
+                cwd=run_cwd,
                 env=env,
                 capture_output=True,
                 text=True,
@@ -619,8 +661,8 @@ class CloudDesignerManager:
             # Use --no-cache to ensure designer-desktop is built fresh
             logger.info("[Docker CloudDesigner] Step 3/4: Building designer-desktop image (this may take several minutes)...")
             result = subprocess.run(
-                docker_cmd + ["compose", "build", "--no-cache", "designer-desktop"],
-                cwd=self.compose_dir,
+                docker_cmd + compose_args + ["build", "--no-cache", "designer-desktop"],
+                cwd=run_cwd,
                 env=env,
                 capture_output=True,
                 text=True,
@@ -641,8 +683,8 @@ class CloudDesignerManager:
 
             logger.info("[Docker CloudDesigner] Step 4/4: Starting containers with docker compose up...")
             result = subprocess.run(
-                docker_cmd + ["compose", "up", "-d"],
-                cwd=self.compose_dir,
+                docker_cmd + compose_args + ["up", "-d"],
+                cwd=run_cwd,
                 env=env,
                 capture_output=True,
                 text=True,
@@ -702,9 +744,21 @@ class CloudDesignerManager:
             logger.info("Stopping CloudDesigner stack")
             docker_cmd = _get_docker_command()
 
+            # Handle WSL path conversion
+            use_wsl = _is_using_wsl_docker()
+            compose_file = self.compose_dir / "docker-compose.yml"
+
+            if use_wsl:
+                wsl_compose_file = _windows_to_wsl_path(compose_file)
+                compose_args = ["compose", "-f", wsl_compose_file]
+                run_cwd = None
+            else:
+                compose_args = ["compose"]
+                run_cwd = self.compose_dir
+
             result = subprocess.run(
-                docker_cmd + ["compose", "down"],
-                cwd=self.compose_dir,
+                docker_cmd + compose_args + ["down"],
+                cwd=run_cwd,
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
@@ -762,14 +816,26 @@ class CloudDesignerManager:
         cleanup_results = []
         docker_cmd = _get_docker_command()
 
+        # Handle WSL path conversion
+        use_wsl = _is_using_wsl_docker()
+        compose_file = self.compose_dir / "docker-compose.yml"
+
+        if use_wsl:
+            wsl_compose_file = _windows_to_wsl_path(compose_file)
+            compose_args = ["compose", "-f", wsl_compose_file]
+            run_cwd = None
+        else:
+            compose_args = ["compose"]
+            run_cwd = self.compose_dir
+
         try:
             logger.info("[CloudDesigner Cleanup] Starting thorough cleanup...")
 
             # Step 1: docker compose down -v --remove-orphans
             logger.info("[CloudDesigner Cleanup] Step 1/5: Stopping and removing containers and volumes...")
             result = subprocess.run(
-                docker_cmd + ["compose", "down", "-v", "--remove-orphans"],
-                cwd=self.compose_dir,
+                docker_cmd + compose_args + ["down", "-v", "--remove-orphans"],
+                cwd=run_cwd,
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
