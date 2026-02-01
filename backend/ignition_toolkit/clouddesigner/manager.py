@@ -744,6 +744,142 @@ class CloudDesignerManager:
                 "error": str(e),
             }
 
+    def cleanup(self) -> dict:
+        """
+        Forcefully clean up all CloudDesigner containers, volumes, and images.
+
+        This is useful when containers get into a bad state or there are conflicts.
+
+        Returns:
+            dict with success status and details of cleanup operations
+        """
+        if not self.compose_dir.exists():
+            return {
+                "success": False,
+                "error": f"Docker compose directory not found: {self.compose_dir}",
+            }
+
+        cleanup_results = []
+        docker_cmd = _get_docker_command()
+
+        try:
+            logger.info("[CloudDesigner Cleanup] Starting thorough cleanup...")
+
+            # Step 1: docker compose down -v --remove-orphans
+            logger.info("[CloudDesigner Cleanup] Step 1/5: Stopping and removing containers and volumes...")
+            result = subprocess.run(
+                docker_cmd + ["compose", "down", "-v", "--remove-orphans"],
+                cwd=self.compose_dir,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=120,
+                creationflags=_CREATION_FLAGS,
+            )
+            cleanup_results.append(f"compose down: {'OK' if result.returncode == 0 else result.stderr[:100]}")
+
+            # Step 2: Force remove any lingering clouddesigner containers
+            logger.info("[CloudDesigner Cleanup] Step 2/5: Force removing any lingering containers...")
+            container_names = [
+                "clouddesigner-desktop",
+                "clouddesigner-guacamole",
+                "clouddesigner-guacd",
+                "clouddesigner-nginx",
+            ]
+            for container in container_names:
+                result = subprocess.run(
+                    docker_cmd + ["rm", "-f", container],
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    timeout=30,
+                    creationflags=_CREATION_FLAGS,
+                )
+                if result.returncode == 0:
+                    cleanup_results.append(f"rm {container}: removed")
+
+            # Step 3: Remove clouddesigner network if it exists
+            logger.info("[CloudDesigner Cleanup] Step 3/5: Removing network...")
+            result = subprocess.run(
+                docker_cmd + ["network", "rm", "docker_files_clouddesigner-net"],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=30,
+                creationflags=_CREATION_FLAGS,
+            )
+            if result.returncode == 0:
+                cleanup_results.append("network: removed")
+
+            # Step 4: Remove clouddesigner volumes
+            logger.info("[CloudDesigner Cleanup] Step 4/5: Removing volumes...")
+            volume_names = [
+                "docker_files_guacamole-data",
+                "docker_files_designer-home",
+            ]
+            for volume in volume_names:
+                result = subprocess.run(
+                    docker_cmd + ["volume", "rm", "-f", volume],
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    timeout=30,
+                    creationflags=_CREATION_FLAGS,
+                )
+                if result.returncode == 0:
+                    cleanup_results.append(f"volume {volume}: removed")
+
+            # Step 5: Optionally remove cached images
+            logger.info("[CloudDesigner Cleanup] Step 5/5: Removing cached images...")
+            images_to_remove = [
+                "docker_files-designer-desktop",
+                "docker_files-nginx",
+                "guacamole/guacamole:1.5.4",
+                "guacamole/guacd:1.5.4",
+            ]
+            for image in images_to_remove:
+                result = subprocess.run(
+                    docker_cmd + ["rmi", "-f", image],
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    timeout=60,
+                    creationflags=_CREATION_FLAGS,
+                )
+                if result.returncode == 0:
+                    cleanup_results.append(f"image {image}: removed")
+
+            logger.info(f"[CloudDesigner Cleanup] Cleanup complete: {cleanup_results}")
+            return {
+                "success": True,
+                "output": "\n".join(cleanup_results),
+            }
+
+        except subprocess.TimeoutExpired as e:
+            logger.error(f"[CloudDesigner Cleanup] Timeout: {e}")
+            return {
+                "success": False,
+                "error": "Cleanup operation timed out",
+                "output": "\n".join(cleanup_results),
+            }
+        except FileNotFoundError:
+            return {
+                "success": False,
+                "error": "Docker not found",
+            }
+        except Exception as e:
+            logger.exception("[CloudDesigner Cleanup] Error during cleanup")
+            return {
+                "success": False,
+                "error": str(e),
+                "output": "\n".join(cleanup_results),
+            }
+
     def get_config(self) -> dict:
         """
         Get current CloudDesigner configuration.

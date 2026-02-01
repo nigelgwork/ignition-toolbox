@@ -69,6 +69,14 @@ class StopResponse(BaseModel):
     error: str | None = None
 
 
+class CleanupResponse(BaseModel):
+    """Response from cleanup operation"""
+
+    success: bool
+    output: str | None = None
+    error: str | None = None
+
+
 class ConfigResponse(BaseModel):
     """CloudDesigner configuration response"""
 
@@ -196,6 +204,32 @@ async def stop_clouddesigner():
         )
     except Exception as e:
         logger.exception("Error stopping CloudDesigner")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/cleanup", response_model=CleanupResponse)
+async def cleanup_clouddesigner():
+    """
+    Forcefully clean up all CloudDesigner containers, volumes, and images.
+
+    Use this when containers are in a bad state or there are conflicts.
+
+    Returns:
+        CleanupResponse with success status and cleanup details
+    """
+    try:
+        logger.info("[CloudDesigner API] Cleanup request received")
+        manager = get_clouddesigner_manager()
+        # Run in thread to avoid blocking the event loop
+        result = await asyncio.to_thread(manager.cleanup)
+
+        return CleanupResponse(
+            success=result["success"],
+            output=result.get("output"),
+            error=result.get("error"),
+        )
+    except Exception as e:
+        logger.exception("Error cleaning up CloudDesigner")
         raise HTTPException(status_code=500, detail=str(e))
 
 

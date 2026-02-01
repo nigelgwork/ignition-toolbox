@@ -643,6 +643,11 @@ export const api = {
         method: 'POST',
       }),
 
+    cleanup: () =>
+      fetchJSON<CloudDesignerStopResponse>('/api/clouddesigner/cleanup', {
+        method: 'POST',
+      }),
+
     getConfig: () =>
       fetchJSON<CloudDesignerConfig>('/api/clouddesigner/config'),
   },

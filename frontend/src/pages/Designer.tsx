@@ -31,6 +31,7 @@ import {
   Info as InfoIcon,
   ExpandMore as ExpandMoreIcon,
   Refresh as RefreshIcon,
+  DeleteForever as CleanupIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -106,6 +107,23 @@ export function Designer() {
     },
   });
 
+  // Cleanup mutation - forcefully removes all containers, volumes, and images
+  const cleanupMutation = useMutation({
+    mutationFn: () => api.cloudDesigner.cleanup(),
+    onSuccess: (data) => {
+      if (data.success) {
+        setStartError(null);
+      } else {
+        setStartError(data.error || 'Cleanup failed');
+      }
+      // Refresh status
+      queryClient.invalidateQueries({ queryKey: ['clouddesigner-status'] });
+    },
+    onError: (error: Error) => {
+      setStartError(error.message);
+    },
+  });
+
   // Handle start button click
   const handleStart = () => {
     if (selectedCredential?.gateway_url) {
@@ -142,6 +160,7 @@ export function Designer() {
   const isRunning = containerStatus?.status === 'running';
   const isStarting = startMutation.isPending;
   const isStopping = stopMutation.isPending;
+  const isCleaning = cleanupMutation.isPending;
 
   // Auto-expand debug panel when starting to show progress
   useEffect(() => {
@@ -436,6 +455,24 @@ Version: ${dockerStatus.version || 'Not detected'}
 Path: ${dockerStatus.docker_path || 'Not found'}
 Container: ${containerStatus?.status || 'not_created'}`}
                     </Typography>
+                  </Box>
+
+                  {/* Cleanup Button */}
+                  <Box>
+                    <Typography variant="subtitle2" gutterBottom>Container Cleanup</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      If containers are in a bad state or causing conflicts, use this to forcefully clean up everything.
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      color="warning"
+                      size="small"
+                      startIcon={isCleaning ? <CircularProgress size={14} /> : <CleanupIcon />}
+                      onClick={() => cleanupMutation.mutate()}
+                      disabled={isCleaning || isStarting}
+                    >
+                      {isCleaning ? 'Cleaning up...' : 'Clean Up Containers'}
+                    </Button>
                   </Box>
 
                   <Box>
