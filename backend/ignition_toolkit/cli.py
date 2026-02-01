@@ -9,11 +9,13 @@ import uvicorn
 from rich.console import Console
 from rich.panel import Panel
 
+from ignition_toolkit import __version__
+
 console = Console()
 
 
 @click.group()
-@click.version_option(version="1.0.0")
+@click.version_option(version=__version__)
 def main() -> None:
     """Ignition Automation Toolkit - SCADA automation made simple"""
     pass

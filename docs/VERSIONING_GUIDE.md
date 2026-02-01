@@ -4,9 +4,10 @@ This guide explains how to manage versions when making changes to the Ignition A
 
 ## Current Version
 
-**Version**: 1.0.0
-**Release Date**: 2025-10-22
-**Tag**: v1.0.0
+**Electron App Version**: 1.4.52
+**Backend Version**: 5.1.2
+**Release Date**: 2026-02-01
+**Tag**: v1.4.52
 
 ## Semantic Versioning
 
@@ -303,6 +304,6 @@ ignition-toolkit --version
 
 ---
 
-**Current Version**: 1.0.0
-**Next Version**: TBD (based on changes)
+**Current Electron Version**: 1.4.52
+**Current Backend Version**: 5.1.2
 **Maintainer**: Nigel G
