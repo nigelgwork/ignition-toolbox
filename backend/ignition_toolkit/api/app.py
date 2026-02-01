@@ -31,6 +31,7 @@ from ignition_toolkit.api.routers.playbooks import router as playbooks_router
 from ignition_toolkit.api.routers.schedules import router as schedules_router
 from ignition_toolkit.api.routers.stackbuilder import router as stackbuilder_router
 from ignition_toolkit.api.routers.clouddesigner import router as clouddesigner_router
+from ignition_toolkit.api.routers.context import router as context_router
 from ignition_toolkit.api.routers.updates import router as updates_router
 from ignition_toolkit.api.routers.websockets import router as websockets_router
 from ignition_toolkit.api.routers.logs import router as logs_router
@@ -81,6 +82,9 @@ app.include_router(stackbuilder_router)
 
 # Register CloudDesigner router
 app.include_router(clouddesigner_router)
+
+# Register Context router (for AI assistant)
+app.include_router(context_router)
 
 # Register WebSocket router
 app.include_router(websockets_router)

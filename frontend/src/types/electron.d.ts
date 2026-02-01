@@ -63,6 +63,18 @@ interface ElectronAPI {
   cloudDesigner?: {
     openWindow: () => Promise<boolean>;
   };
+
+  // Chat (Clawdbot)
+  chat: {
+    checkAvailability: () => Promise<boolean>;
+    execute: (prompt: string) => Promise<{ success: boolean; output: string; error?: string }>;
+    cancel: () => Promise<{ success: boolean }>;
+    getContext: () => Promise<{
+      playbookCount: number;
+      recentExecutions: { name: string; status: string }[];
+      cloudDesignerStatus: string;
+    } | null>;
+  };
 }
 
 declare global {
