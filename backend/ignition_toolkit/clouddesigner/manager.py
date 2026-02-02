@@ -377,6 +377,115 @@ def _quote_wsl_path(path: str) -> str:
     return path
 
 
+def _get_docker_host_ip() -> str | None:
+    """
+    Get the IP address that Docker containers can use to reach the host.
+
+    For Docker running in WSL, containers need to use the WSL gateway IP
+    instead of 'localhost' to reach services on the Windows host.
+
+    Returns:
+        The host IP address, or None if not determinable
+    """
+    # Check if we're running inside WSL (backend running in WSL)
+    if _is_wsl():
+        try:
+            # Get the WSL gateway IP directly
+            result = subprocess.run(
+                ["ip", "route"],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=10,
+            )
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
+                    if line.startswith('default via'):
+                        # Extract IP from "default via 192.168.x.x dev eth0"
+                        parts = line.split()
+                        if len(parts) >= 3:
+                            gateway_ip = parts[2]
+                            logger.info(f"[CloudDesigner] Running in WSL - gateway IP: {gateway_ip}")
+                            return gateway_ip
+        except Exception as e:
+            logger.warning(f"[CloudDesigner] Failed to get WSL gateway IP: {e}")
+
+    # Check if we're on Windows calling WSL Docker
+    use_wsl = _is_using_wsl_docker()
+    if use_wsl:
+        try:
+            docker_cmd = _get_docker_command()
+            # Get the default gateway inside WSL (this is the Windows host from WSL's perspective)
+            result = subprocess.run(
+                docker_cmd[:-1] + ["ip", "route"],  # Remove 'docker' from cmd, add 'ip route'
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=10,
+                creationflags=_CREATION_FLAGS,
+            )
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
+                    if line.startswith('default via'):
+                        # Extract IP from "default via 192.168.x.x dev eth0"
+                        parts = line.split()
+                        if len(parts) >= 3:
+                            gateway_ip = parts[2]
+                            logger.info(f"[CloudDesigner] Detected WSL gateway IP: {gateway_ip}")
+                            return gateway_ip
+        except Exception as e:
+            logger.warning(f"[CloudDesigner] Failed to get WSL gateway IP: {e}")
+
+    # For Docker Desktop on Mac/Linux, try host.docker.internal
+    return "host.docker.internal"
+
+
+def _translate_localhost_url(url: str) -> str:
+    """
+    Translate a localhost URL to one that Docker containers can reach.
+
+    When running Docker (especially via WSL), containers cannot reach
+    'localhost' on the host. This function replaces localhost with the
+    appropriate host IP address.
+
+    Args:
+        url: The original URL (e.g., "http://localhost:8088")
+
+    Returns:
+        Translated URL (e.g., "http://192.168.48.1:8088") or original if no translation needed
+    """
+    from urllib.parse import urlparse, urlunparse
+
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+
+    # Check if this is a localhost URL that needs translation
+    if host.lower() in ("localhost", "127.0.0.1", "0.0.0.0"):
+        docker_host = _get_docker_host_ip()
+        if docker_host:
+            # Reconstruct URL with new host
+            # Handle port preservation
+            if parsed.port:
+                new_netloc = f"{docker_host}:{parsed.port}"
+            else:
+                new_netloc = docker_host
+
+            new_url = urlunparse((
+                parsed.scheme,
+                new_netloc,
+                parsed.path,
+                parsed.params,
+                parsed.query,
+                parsed.fragment
+            ))
+            logger.info(f"[CloudDesigner] Translated URL: {url} -> {new_url}")
+            return new_url
+
+    return url
+
+
 def _get_docker_files_path() -> Path:
     """
     Get the path to the Docker files directory.
@@ -598,7 +707,11 @@ class CloudDesignerManager:
 
         # Prepare environment
         env = os.environ.copy()
-        env["IGNITION_GATEWAY_URL"] = gateway_url
+
+        # Translate localhost URLs for Docker container connectivity
+        # Containers can't reach 'localhost' on the host, need to use host IP
+        docker_gateway_url = _translate_localhost_url(gateway_url)
+        env["IGNITION_GATEWAY_URL"] = docker_gateway_url
 
         # Fetch credentials from vault if credential_name is provided
         if credential_name:

@@ -1,23 +1,21 @@
 #!/bin/bash
 # designer-desktop/scripts/launch-designer.sh
 #
-# Launches the Ignition Designer with auto-login support.
-# Reads credentials from environment variables or credentials file.
+# Launches the Ignition Designer Launcher and automates gateway setup/login.
+# The Designer Launcher doesn't support command-line args for gateway/credentials,
+# so we use xdotool to automate the UI interaction.
 
 set -e
 
 LAUNCHER_DIR="/home/designer/.local/share/designerlauncher"
 LOG_FILE="/tmp/launch-designer.log"
 CREDENTIALS_FILE="/tmp/designer-credentials.env"
+AUTOMATION_SCRIPT="/usr/local/bin/automate-designer-login.sh"
 
 # Source credentials file if it exists (written by start-desktop.sh)
-# This is more reliable than environment variable inheritance through VNC/XFCE
 if [ -f "$CREDENTIALS_FILE" ]; then
     source "$CREDENTIALS_FILE"
 fi
-
-# Configuration from arguments (override) or environment/file
-GATEWAY_URL="${1:-$IGNITION_GATEWAY_URL}"
 
 # Logging function
 log() {
@@ -35,30 +33,40 @@ if [ ! -f "$LAUNCHER_DIR/designerlauncher.sh" ]; then
     exit 1
 fi
 
-# Build launcher arguments
-LAUNCHER_ARGS=""
-
-# Add gateway URL if provided
-if [ -n "$GATEWAY_URL" ]; then
-    log "Gateway URL: $GATEWAY_URL"
-    LAUNCHER_ARGS="$LAUNCHER_ARGS -g $GATEWAY_URL"
+# Log credentials status
+if [ -n "$IGNITION_GATEWAY_URL" ]; then
+    log "Gateway URL: $IGNITION_GATEWAY_URL"
 else
     log "WARNING: No gateway URL provided"
 fi
 
-# Add credentials for auto-login if provided
 if [ -n "$IGNITION_USERNAME" ] && [ -n "$IGNITION_PASSWORD" ]; then
     log "Auto-login enabled for user: $IGNITION_USERNAME"
-    LAUNCHER_ARGS="$LAUNCHER_ARGS -u $IGNITION_USERNAME -p $IGNITION_PASSWORD"
 else
     log "No credentials provided - manual login required"
-    log "  IGNITION_USERNAME is ${IGNITION_USERNAME:+set}${IGNITION_USERNAME:-not set}"
-    log "  IGNITION_PASSWORD is ${IGNITION_PASSWORD:+set}${IGNITION_PASSWORD:-not set}"
 fi
 
-log "Launcher args: $LAUNCHER_ARGS"
-log "Launching designer..."
+# Check if xdotool is available for automation
+if command -v xdotool &> /dev/null && [ -n "$IGNITION_GATEWAY_URL" ]; then
+    log "xdotool available - will automate gateway setup and login"
 
-# Use the bundled launcher which has its own Java runtime
+    # Start the automation script in the background
+    # It will wait for the launcher window and then automate the UI
+    if [ -x "$AUTOMATION_SCRIPT" ]; then
+        log "Starting automation script in background..."
+        nohup "$AUTOMATION_SCRIPT" >> /tmp/automate-designer.log 2>&1 &
+        AUTOMATION_PID=$!
+        log "Automation script started with PID: $AUTOMATION_PID"
+    else
+        log "WARNING: Automation script not found or not executable: $AUTOMATION_SCRIPT"
+    fi
+else
+    log "xdotool not available or no gateway URL - manual setup required"
+fi
+
+log "Launching Designer Launcher..."
+
+# Launch the Designer Launcher (without args - they don't work)
+# The automation script will handle gateway setup and login
 cd "$LAUNCHER_DIR"
-exec ./designerlauncher.sh $LAUNCHER_ARGS "$@"
+exec ./designerlauncher.sh "$@"

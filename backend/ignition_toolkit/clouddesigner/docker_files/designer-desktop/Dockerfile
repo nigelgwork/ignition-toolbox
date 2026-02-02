@@ -65,6 +65,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     # GUI dialogs for gateway selector
     zenity \
+    # X11 automation for Designer Launcher setup
+    xdotool \
+    # Screenshot tool for debugging automation
+    scrot \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -89,10 +93,15 @@ RUN chmod 755 /usr/local/bin/configure-vnc.sh \
 # ============================================
 # XFCE Configuration for Optimal Viewing
 # ============================================
-RUN mkdir -p /home/designer/.config/xfce4/xfconf/xfce-perchannel-xml
+RUN mkdir -p /home/designer/.config/xfce4/xfconf/xfce-perchannel-xml \
+    && mkdir -p /home/designer/.config/autostart
 
 # XFCE settings optimized for remote viewing
 COPY config/xfce4/ /home/designer/.config/xfce4/
+
+# Copy autostart to standard freedesktop location
+# XFCE respects ~/.config/autostart/ for session autostart apps
+COPY config/xfce4/autostart/designer.desktop /home/designer/.config/autostart/
 
 # ============================================
 # Designer Download and Launch Scripts
@@ -101,6 +110,7 @@ COPY scripts/download-designer.sh /usr/local/bin/
 COPY scripts/launch-designer.sh /usr/local/bin/
 COPY scripts/start-desktop.sh /usr/local/bin/
 COPY scripts/gateway-selector.sh /usr/local/bin/
+COPY scripts/automate-designer-login.sh /usr/local/bin/
 RUN chmod 755 /usr/local/bin/*.sh
 
 # ============================================
