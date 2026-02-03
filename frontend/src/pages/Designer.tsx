@@ -370,9 +370,16 @@ docker info`}
             )}
 
             {/* No credential selected */}
-            {!selectedCredential?.gateway_url && !isRunning && (
-              <Alert severity="info" sx={{ mb: 2 }}>
-                Select a credential with a gateway URL from the header dropdown to start the Designer container.
+            {!selectedCredential && !isRunning && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                <strong>No credential selected.</strong> Select a credential from the header dropdown to start the Designer container.
+              </Alert>
+            )}
+
+            {/* Credential selected but no gateway URL */}
+            {selectedCredential && !selectedCredential.gateway_url && !isRunning && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                <strong>Credential "{selectedCredential.name}" has no gateway URL.</strong> Edit the credential in Settings to add a gateway URL.
               </Alert>
             )}
 
