@@ -51,6 +51,13 @@ export function Designer() {
   const [showDebug, setShowDebug] = useState(false);
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
 
+  // Debug logging for credential state
+  useEffect(() => {
+    console.log('[Designer] Component mounted/updated');
+    console.log('[Designer] selectedCredential:', selectedCredential);
+    console.log('[Designer] gateway_url:', selectedCredential?.gateway_url);
+  }, [selectedCredential]);
+
   // Query Docker status
   const {
     data: dockerStatus,
@@ -436,7 +443,14 @@ docker info`}
                   variant="contained"
                   color="primary"
                   startIcon={isStarting ? <CircularProgress size={16} color="inherit" /> : <StartIcon />}
-                  onClick={handleStart}
+                  onClick={() => {
+                    console.log('=== BUTTON CLICKED ===');
+                    console.log('selectedCredential:', selectedCredential);
+                    console.log('gateway_url:', selectedCredential?.gateway_url);
+                    console.log('isStarting:', isStarting);
+                    console.log('Button disabled:', !selectedCredential?.gateway_url || isStarting);
+                    handleStart();
+                  }}
                   disabled={!selectedCredential?.gateway_url || isStarting}
                   size="large"
                 >
