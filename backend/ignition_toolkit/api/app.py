@@ -105,15 +105,14 @@ logger.info("Log capture initialized for UI access")
 # No external dependencies - uses token bucket algorithm
 app.add_middleware(RateLimitMiddleware)
 
-# CORS middleware - Restrict to localhost only (secure default)
-ALLOWED_ORIGINS = os.getenv(
-    "ALLOWED_ORIGINS",
-    "http://localhost:5000,http://127.0.0.1:5000,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5001,http://127.0.0.1:5001",
-).split(",")
-
+# CORS middleware - Allow all origins for local desktop app
+# This is safe because:
+# 1. Backend only binds to 127.0.0.1 (localhost)
+# 2. This is a single-user desktop application
+# 3. The Electron app uses file:// or app:// protocol which doesn't match fixed origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,  # Restricted to configured origins only
+    allow_origins=["*"],  # Allow all origins for Electron app compatibility
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
