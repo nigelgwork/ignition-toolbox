@@ -7,6 +7,20 @@ Manages the ignition-designer-browser Docker stack that provides:
 - Auto-connection to configured Ignition gateways
 """
 
-from ignition_toolkit.clouddesigner.manager import CloudDesignerManager
+from ignition_toolkit.clouddesigner.manager import (
+    CloudDesignerManager,
+    get_clouddesigner_manager,
+)
+from ignition_toolkit.clouddesigner.models import (
+    CloudDesignerStatus,
+    ContainerStatus,
+    DockerStatus,
+)
 
-__all__ = ["CloudDesignerManager"]
+__all__ = [
+    "CloudDesignerManager",
+    "CloudDesignerStatus",
+    "ContainerStatus",
+    "DockerStatus",
+    "get_clouddesigner_manager",
+]

@@ -5,12 +5,15 @@ Provides API key-based authentication for production deployment.
 For localhost-only use, authentication can be disabled via environment variable.
 """
 
+import logging
 import os
 import secrets
 from typing import Optional
 from fastapi import Header, HTTPException, Request
 from fastapi.security import APIKeyHeader
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # API key configuration
 API_KEY_HEADER = "X-API-Key"
@@ -59,7 +62,7 @@ def get_or_generate_api_key() -> str:
         api_key_file.chmod(0o600)  # Owner read/write only
     except Exception as e:
         # Log warning but continue (key still works from memory)
-        print(f"Warning: Could not save API key to {api_key_file}: {e}")
+        logger.warning(f"Could not save API key to {api_key_file}: {e}")
 
     return api_key
 

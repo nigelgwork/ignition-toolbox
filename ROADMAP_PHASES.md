@@ -39,16 +39,16 @@
 
 ### 1.1 Refactor Large Files (~30h)
 
-- [ ] Split `clouddesigner/manager.py` (1,169 lines) into:
-  - `clouddesigner/lifecycle.py` - Container start/stop/cleanup
-  - `clouddesigner/auth.py` - Auto-login automation
-  - `clouddesigner/paths.py` - WSL path handling
+- [x] Split `clouddesigner/manager.py` (1,169 lines) into: ✅ DONE (v1.4.67)
+  - `clouddesigner/docker.py` - Docker/WSL detection and path utilities
+  - `clouddesigner/models.py` - Data models (DockerStatus, CloudDesignerStatus)
+  - `clouddesigner/manager.py` - CloudDesignerManager class only
   - Effort: 12h
 
-- [ ] Split `api/routers/stackbuilder.py` (1,084 lines) into:
-  - `routers/stackbuilder/catalog.py` - Service catalog operations
-  - `routers/stackbuilder/generator.py` - Compose generation
-  - `routers/stackbuilder/deployment.py` - Stack deployment
+- [x] Split `api/routers/stackbuilder.py` (1,084 lines) into: ✅ DONE (v1.4.67)
+  - `routers/stackbuilder/models.py` - Pydantic request/response models
+  - `routers/stackbuilder/installer_scripts.py` - Docker installer scripts
+  - `routers/stackbuilder/main.py` - Router with all endpoints
   - Effort: 10h
 
 - [ ] Split `api/routers/executions.py` (953 lines):
@@ -65,7 +65,11 @@
 
 ### 1.3 Logging Standardization (~15h)
 
-- [ ] Replace 221 `print()` statements with proper `logging` calls
+- [x] Audit print() statements - most are intentional ✅ DONE (v1.4.67)
+  - User-facing startup messages (auth.py) - keep as print()
+  - Generated script content (ignition_db_registration.py) - keep as print()
+  - Docstring examples - keep as print()
+  - Fixed 1 actual logging issue in auth.py
 - [ ] Standardize log levels across all modules
 - [ ] Remove debug `console.log` from production frontend
 - [ ] Effort: 15h

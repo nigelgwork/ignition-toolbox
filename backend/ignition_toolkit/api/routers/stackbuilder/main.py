@@ -1,5 +1,5 @@
 """
-Stack Builder routes
+Stack Builder API Router
 
 Provides endpoints for building Docker Compose stacks with
 automatic service integration detection and configuration generation.
@@ -10,26 +10,31 @@ import logging
 import re
 import zipfile
 from functools import lru_cache
-from typing import Any
 
 import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, field_validator
 
+from ignition_toolkit.api.routers.stackbuilder.installer_scripts import (
+    DOCKER_INSTALL_LINUX,
+    DOCKER_INSTALL_WINDOWS,
+)
+from ignition_toolkit.api.routers.stackbuilder.models import (
+    DeploymentResult,
+    DeploymentStatus,
+    DeployStackRequest,
+    SavedStackCreate,
+    SavedStackInfo,
+    StackConfig,
+)
 from ignition_toolkit.stackbuilder.catalog import get_service_catalog
-from ignition_toolkit.stackbuilder.stack_runner import get_stack_runner
-
-# Validation patterns for Docker-compatible names
-# Must start with alphanumeric, can contain letters, numbers, underscores, periods, hyphens
-VALID_NAME_PATTERN = r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$"
-RESERVED_NAMES = {"docker", "host", "none", "bridge", "null", "default"}
 from ignition_toolkit.stackbuilder.compose_generator import (
     ComposeGenerator,
     GlobalSettings,
     IntegrationSettings,
 )
 from ignition_toolkit.stackbuilder.integration_engine import get_integration_engine
+from ignition_toolkit.stackbuilder.stack_runner import get_stack_runner
 from ignition_toolkit.storage.database import get_database
 from ignition_toolkit.storage.models import SavedStackModel
 
@@ -45,7 +50,7 @@ router = APIRouter(prefix="/api/stackbuilder", tags=["stackbuilder"])
 
 
 def _convert_stack_config(
-    stack_config: "StackConfig",
+    stack_config: StackConfig,
 ) -> tuple[list[dict], GlobalSettings | None, IntegrationSettings | None]:
     """
     Convert Pydantic StackConfig to generator-compatible format.
@@ -84,108 +89,6 @@ def _convert_stack_config(
         )
 
     return instances, global_settings, integration_settings
-
-
-# ============================================================================
-# Pydantic Models
-# ============================================================================
-
-
-class InstanceConfig(BaseModel):
-    """Configuration for a single service instance"""
-
-    app_id: str = Field(..., min_length=1, max_length=64)
-    instance_name: str = Field(
-        ...,
-        min_length=1,
-        max_length=64,
-        pattern=VALID_NAME_PATTERN,
-        description="Docker-compatible instance name",
-    )
-    config: dict[str, Any] = Field(default_factory=dict)
-
-    @field_validator("instance_name")
-    @classmethod
-    def validate_instance_name(cls, v: str) -> str:
-        """Validate instance name is not reserved"""
-        if v.lower() in RESERVED_NAMES:
-            raise ValueError(f"Instance name '{v}' is reserved")
-        return v
-
-
-class GlobalSettingsRequest(BaseModel):
-    """Global settings for the entire stack"""
-
-    stack_name: str = Field(
-        default="iiot-stack",
-        min_length=1,
-        max_length=64,
-        pattern=VALID_NAME_PATTERN,
-        description="Docker-compatible stack name",
-    )
-    timezone: str = "UTC"
-    restart_policy: str = "unless-stopped"
-
-    @field_validator("stack_name")
-    @classmethod
-    def validate_stack_name(cls, v: str) -> str:
-        """Validate stack name is not reserved"""
-        if v.lower() in RESERVED_NAMES:
-            raise ValueError(f"Stack name '{v}' is reserved")
-        return v
-
-
-class IntegrationSettingsRequest(BaseModel):
-    """Settings for automatic integrations"""
-
-    reverse_proxy: dict[str, Any] | None = None
-    mqtt: dict[str, Any] | None = None
-    oauth: dict[str, Any] | None = None
-    database: dict[str, Any] | None = None
-    email: dict[str, Any] | None = None
-
-
-class StackConfig(BaseModel):
-    """Complete stack configuration"""
-
-    instances: list[InstanceConfig]
-    global_settings: GlobalSettingsRequest | None = None
-    integration_settings: IntegrationSettingsRequest | None = None
-
-
-class SavedStackCreate(BaseModel):
-    """Request to save a stack configuration"""
-
-    stack_name: str = Field(
-        ...,
-        min_length=1,
-        max_length=64,
-        pattern=VALID_NAME_PATTERN,
-        description="Docker-compatible stack name",
-    )
-    description: str | None = None
-    config_json: dict[str, Any]
-    global_settings: dict[str, Any] | None = None
-
-    @field_validator("stack_name")
-    @classmethod
-    def validate_stack_name(cls, v: str) -> str:
-        """Validate stack name is not reserved"""
-        if v.lower() in RESERVED_NAMES:
-            raise ValueError(f"Stack name '{v}' is reserved")
-        return v
-
-
-class SavedStackInfo(BaseModel):
-    """Saved stack information"""
-
-    id: int
-    stack_name: str
-    description: str | None
-    config_json: dict[str, Any]
-    global_settings: dict[str, Any] | None
-    created_at: str | None
-    updated_at: str | None
 
 
 # ============================================================================
@@ -499,190 +402,6 @@ async def delete_saved_stack(stack_id: int):
 # ============================================================================
 
 
-DOCKER_INSTALL_LINUX = '''#!/bin/bash
-# Docker Installation Script for Linux
-# Supports: Ubuntu, Debian, CentOS, RHEL, Fedora, Arch
-
-set -e
-
-echo "=========================================="
-echo "     Docker Installation Script"
-echo "=========================================="
-echo ""
-
-# Detect OS
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    OS=$ID
-    VERSION=$VERSION_ID
-else
-    echo "Cannot detect OS. Please install Docker manually."
-    exit 1
-fi
-
-echo "Detected OS: $OS $VERSION"
-echo ""
-
-install_docker_debian() {
-    echo "Installing Docker on Debian/Ubuntu..."
-
-    # Remove old versions
-    sudo apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
-
-    # Install dependencies
-    sudo apt-get update
-    sudo apt-get install -y ca-certificates curl gnupg lsb-release
-
-    # Add Docker GPG key
-    sudo mkdir -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/$OS/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-
-    # Set up repository
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$OS $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-    # Install Docker
-    sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-}
-
-install_docker_rhel() {
-    echo "Installing Docker on RHEL/CentOS/Fedora..."
-
-    # Remove old versions
-    sudo yum remove -y docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine 2>/dev/null || true
-
-    # Install dependencies
-    sudo yum install -y yum-utils
-
-    # Set up repository
-    sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-
-    # Install Docker
-    sudo yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-}
-
-install_docker_arch() {
-    echo "Installing Docker on Arch Linux..."
-    sudo pacman -Sy docker docker-compose --noconfirm
-}
-
-# Install based on OS
-case $OS in
-    ubuntu|debian)
-        install_docker_debian
-        ;;
-    centos|rhel|fedora)
-        install_docker_rhel
-        ;;
-    arch)
-        install_docker_arch
-        ;;
-    *)
-        echo "Unsupported OS: $OS"
-        echo "Please install Docker manually from https://docs.docker.com/engine/install/"
-        exit 1
-        ;;
-esac
-
-# Start Docker service
-echo ""
-echo "Starting Docker service..."
-sudo systemctl start docker
-sudo systemctl enable docker
-
-# Add current user to docker group
-echo "Adding $USER to docker group..."
-sudo usermod -aG docker $USER
-
-echo ""
-echo "=========================================="
-echo "     Docker Installation Complete!"
-echo "=========================================="
-echo ""
-echo "Please log out and back in for group changes to take effect."
-echo ""
-echo "Verify installation:"
-echo "  docker --version"
-echo "  docker compose version"
-echo ""
-'''
-
-DOCKER_INSTALL_WINDOWS = '''# Docker Desktop Installation Script for Windows
-# Run in PowerShell as Administrator
-
-Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "     Docker Desktop Installation Script" -ForegroundColor Cyan
-Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host ""
-
-# Check if running as Administrator
-$currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host "ERROR: This script must be run as Administrator" -ForegroundColor Red
-    Write-Host "Right-click PowerShell and select 'Run as Administrator'" -ForegroundColor Yellow
-    exit 1
-}
-
-# Check Windows version
-$osInfo = Get-WmiObject -Class Win32_OperatingSystem
-$osVersion = [System.Version]$osInfo.Version
-if ($osVersion.Major -lt 10) {
-    Write-Host "ERROR: Docker Desktop requires Windows 10 or later" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "Detected: $($osInfo.Caption)" -ForegroundColor Green
-Write-Host ""
-
-# Check if Docker is already installed
-$dockerPath = Get-Command docker -ErrorAction SilentlyContinue
-if ($dockerPath) {
-    Write-Host "Docker is already installed at: $($dockerPath.Source)" -ForegroundColor Yellow
-    docker --version
-    Write-Host ""
-    $continue = Read-Host "Continue with reinstallation? (y/n)"
-    if ($continue -ne "y") {
-        exit 0
-    }
-}
-
-# Enable WSL2
-Write-Host "Enabling Windows Subsystem for Linux..." -ForegroundColor Cyan
-dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
-
-Write-Host "Enabling Virtual Machine Platform..." -ForegroundColor Cyan
-dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
-
-# Download Docker Desktop installer
-$installerUrl = "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
-$installerPath = "$env:TEMP\\DockerDesktopInstaller.exe"
-
-Write-Host ""
-Write-Host "Downloading Docker Desktop installer..." -ForegroundColor Cyan
-Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -UseBasicParsing
-
-# Install Docker Desktop
-Write-Host "Installing Docker Desktop..." -ForegroundColor Cyan
-Start-Process -FilePath $installerPath -ArgumentList "install --quiet --accept-license" -Wait
-
-# Clean up
-Remove-Item $installerPath -Force
-
-Write-Host ""
-Write-Host "==========================================" -ForegroundColor Green
-Write-Host "     Docker Desktop Installation Complete!" -ForegroundColor Green
-Write-Host "==========================================" -ForegroundColor Green
-Write-Host ""
-Write-Host "IMPORTANT: Please restart your computer to complete the installation." -ForegroundColor Yellow
-Write-Host ""
-Write-Host "After restart:" -ForegroundColor Cyan
-Write-Host "  1. Launch Docker Desktop from the Start menu"
-Write-Host "  2. Complete the initial setup wizard"
-Write-Host "  3. Verify installation: docker --version"
-Write-Host ""
-'''
-
-
 @router.get("/download/docker-installer/linux")
 async def download_docker_installer_linux():
     """Download Docker installation script for Linux"""
@@ -738,7 +457,30 @@ async def generate_offline_bundle(stack_config: StackConfig):
                 images.append(f"{app['image']}:{version}")
 
         # Generate pull script
-        pull_script = f'''#!/bin/bash
+        pull_script = _generate_pull_script(images)
+        load_script = _generate_load_script()
+        offline_readme = _generate_offline_readme(global_settings, images)
+
+        # Create ZIP file
+        stack_name = global_settings.stack_name if global_settings else "iiot-stack"
+        zip_buffer = _create_offline_zip(result, pull_script, load_script, offline_readme, stack_name)
+
+        return StreamingResponse(
+            iter([zip_buffer.getvalue()]),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{stack_name}-offline.zip"'
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error generating offline bundle: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _generate_pull_script(images: list[str]) -> str:
+    """Generate the image pull script"""
+    return f'''#!/bin/bash
 # Pull all Docker images for offline deployment
 # Run this on a machine with internet access
 
@@ -765,8 +507,10 @@ echo "Done! Transfer docker-images.tar.gz to your offline system."
 echo "File size: $(du -h docker-images.tar.gz | cut -f1)"
 '''
 
-        # Generate load script
-        load_script = '''#!/bin/bash
+
+def _generate_load_script() -> str:
+    """Generate the image load script"""
+    return '''#!/bin/bash
 # Load Docker images from archive
 # Run this on your offline/airgapped system
 
@@ -786,12 +530,12 @@ echo "Images loaded successfully!"
 echo "You can now run: docker compose up -d"
 '''
 
-        # Generate offline README
-        stack_name = "iiot-stack"
-        if global_settings:
-            stack_name = global_settings.stack_name
 
-        offline_readme = f'''# {stack_name} - Offline Deployment
+def _generate_offline_readme(global_settings, images: list[str]) -> str:
+    """Generate the offline bundle README"""
+    stack_name = global_settings.stack_name if global_settings else "iiot-stack"
+
+    return f'''# {stack_name} - Offline Deployment
 
 ## Overview
 
@@ -861,89 +605,43 @@ This bundle contains everything needed for airgapped/offline deployment.
 - Run as user in docker group or with sudo
 '''
 
-        # Create ZIP file
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-            zip_file.writestr("docker-compose.yml", result["docker_compose"])
-            zip_file.writestr(".env", result["env"])
-            zip_file.writestr("README.md", offline_readme)
 
-            # Add pull/load scripts with executable permissions
-            pull_info = zipfile.ZipInfo("pull-images.sh")
-            pull_info.external_attr = 0o755 << 16
-            zip_file.writestr(pull_info, pull_script)
+def _create_offline_zip(result: dict, pull_script: str, load_script: str, readme: str, stack_name: str) -> io.BytesIO:
+    """Create the offline bundle ZIP file"""
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        zip_file.writestr("docker-compose.yml", result["docker_compose"])
+        zip_file.writestr(".env", result["env"])
+        zip_file.writestr("README.md", readme)
 
-            load_info = zipfile.ZipInfo("load-images.sh")
-            load_info.external_attr = 0o755 << 16
-            zip_file.writestr(load_info, load_script)
+        # Add pull/load scripts with executable permissions
+        pull_info = zipfile.ZipInfo("pull-images.sh")
+        pull_info.external_attr = 0o755 << 16
+        zip_file.writestr(pull_info, pull_script)
 
-            for file_path, content in result.get("config_files", {}).items():
-                info = zipfile.ZipInfo(file_path)
-                info.external_attr = 0o644 << 16
-                zip_file.writestr(info, content)
+        load_info = zipfile.ZipInfo("load-images.sh")
+        load_info.external_attr = 0o755 << 16
+        zip_file.writestr(load_info, load_script)
 
-            for file_path, content in result.get("startup_scripts", {}).items():
-                info = zipfile.ZipInfo(file_path)
-                info.external_attr = 0o755 << 16
-                zip_file.writestr(info, content)
+        for file_path, content in result.get("config_files", {}).items():
+            info = zipfile.ZipInfo(file_path)
+            info.external_attr = 0o644 << 16
+            zip_file.writestr(info, content)
 
-            zip_file.writestr("configs/.gitkeep", "")
+        for file_path, content in result.get("startup_scripts", {}).items():
+            info = zipfile.ZipInfo(file_path)
+            info.external_attr = 0o755 << 16
+            zip_file.writestr(info, content)
 
-        zip_buffer.seek(0)
+        zip_file.writestr("configs/.gitkeep", "")
 
-        return StreamingResponse(
-            iter([zip_buffer.getvalue()]),
-            media_type="application/zip",
-            headers={
-                "Content-Disposition": f'attachment; filename="{stack_name}-offline.zip"'
-            },
-        )
-
-    except Exception as e:
-        logger.error(f"Error generating offline bundle: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    zip_buffer.seek(0)
+    return zip_buffer
 
 
 # ============================================================================
 # Stack Deployment Routes (Local Docker)
 # ============================================================================
-
-
-class DeployStackRequest(BaseModel):
-    """Request to deploy a stack to local Docker"""
-
-    stack_name: str = Field(
-        ...,
-        min_length=1,
-        max_length=64,
-        pattern=VALID_NAME_PATTERN,
-        description="Docker-compatible stack name",
-    )
-    stack_config: StackConfig
-
-    @field_validator("stack_name")
-    @classmethod
-    def validate_stack_name(cls, v: str) -> str:
-        """Validate stack name is not reserved"""
-        if v.lower() in RESERVED_NAMES:
-            raise ValueError(f"Stack name '{v}' is reserved")
-        return v
-
-
-class DeploymentStatus(BaseModel):
-    """Status of a deployed stack"""
-
-    status: str  # running, partial, stopped, not_deployed, unknown
-    services: dict[str, str]  # service_name -> status
-    error: str | None = None
-
-
-class DeploymentResult(BaseModel):
-    """Result of a deployment operation"""
-
-    success: bool
-    output: str | None = None
-    error: str | None = None
 
 
 @router.get("/docker-status")

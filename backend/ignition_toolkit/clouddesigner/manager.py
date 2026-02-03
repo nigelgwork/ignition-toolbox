@@ -6,504 +6,25 @@ Manages the Docker Compose stack for browser-accessible Ignition Designer.
 
 import logging
 import os
-import platform
-import shutil
-import sys
 import subprocess
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal
+import time
 
+from ignition_toolkit.clouddesigner.docker import (
+    CREATION_FLAGS,
+    find_docker_executable,
+    get_docker_command,
+    get_docker_files_path,
+    is_using_wsl_docker,
+    translate_localhost_url,
+    windows_to_wsl_path,
+)
+from ignition_toolkit.clouddesigner.models import (
+    CloudDesignerStatus,
+    DockerStatus,
+)
 from ignition_toolkit.credentials.vault import get_credential_vault
 
 logger = logging.getLogger(__name__)
-
-# Windows-specific subprocess flag to hide console window
-# On non-Windows platforms, use 0 (no flags)
-_CREATION_FLAGS = (
-    subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
-)
-
-# Cache for the working WSL Docker command prefix
-# This stores the command that successfully found Docker (e.g., ["wsl", "-d", "Ubuntu", "docker"])
-_wsl_docker_command: list[str] | None = None
-
-
-def _is_wsl() -> bool:
-    """
-    Check if running inside Windows Subsystem for Linux (WSL).
-
-    Returns:
-        True if running in WSL, False otherwise
-    """
-    if platform.system() != "Linux":
-        return False
-
-    try:
-        with open("/proc/version", "r", encoding="utf-8", errors="replace") as f:
-            version_info = f.read().lower()
-            return "microsoft" in version_info or "wsl" in version_info
-    except Exception:
-        return False
-
-
-def _check_wsl_docker() -> tuple[bool, str | None]:
-    """
-    Check if Docker is available inside WSL (for Windows with WSL2 backend).
-
-    Tries multiple approaches:
-    1. wsl docker --version (default distro)
-    2. wsl -e docker --version (explicit exec)
-    3. wsl -- docker --version (pass-through)
-    4. Specific distributions: Ubuntu, Debian, etc.
-
-    Returns:
-        Tuple of (available: bool, version: str | None)
-
-    Side effect:
-        Sets _wsl_docker_command global with the working command prefix
-    """
-    global _wsl_docker_command
-
-    current_platform = platform.system()
-    logger.info(f"WSL Docker check - Platform: {current_platform}")
-
-    if current_platform != "Windows":
-        logger.info("WSL Docker check skipped - not on Windows")
-        return False, None
-
-    # First check if wsl.exe exists
-    wsl_path = shutil.which("wsl")
-    if not wsl_path:
-        logger.info("WSL not found in PATH")
-        return False, None
-
-    logger.info(f"WSL found at: {wsl_path}")
-
-    # Different ways to invoke docker via WSL
-    # Each entry is (command_to_test, docker_command_prefix)
-    # Include sudo variants for when Docker requires root access
-    wsl_commands = [
-        (["wsl", "docker", "--version"], ["wsl", "docker"]),
-        (["wsl", "-e", "docker", "--version"], ["wsl", "-e", "docker"]),
-        (["wsl", "--", "docker", "--version"], ["wsl", "--", "docker"]),
-        # Try with sudo (for Docker installed as root only)
-        (["wsl", "sudo", "docker", "--version"], ["wsl", "sudo", "docker"]),
-        (["wsl", "-e", "sudo", "docker", "--version"], ["wsl", "-e", "sudo", "docker"]),
-        # Try specific common distributions
-        (["wsl", "-d", "Ubuntu", "docker", "--version"], ["wsl", "-d", "Ubuntu", "docker"]),
-        (["wsl", "-d", "Ubuntu", "sudo", "docker", "--version"], ["wsl", "-d", "Ubuntu", "sudo", "docker"]),
-        (["wsl", "-d", "Ubuntu-22.04", "docker", "--version"], ["wsl", "-d", "Ubuntu-22.04", "docker"]),
-        (["wsl", "-d", "Ubuntu-22.04", "sudo", "docker", "--version"], ["wsl", "-d", "Ubuntu-22.04", "sudo", "docker"]),
-        (["wsl", "-d", "Ubuntu-24.04", "docker", "--version"], ["wsl", "-d", "Ubuntu-24.04", "docker"]),
-        (["wsl", "-d", "Ubuntu-24.04", "sudo", "docker", "--version"], ["wsl", "-d", "Ubuntu-24.04", "sudo", "docker"]),
-        (["wsl", "-d", "Debian", "docker", "--version"], ["wsl", "-d", "Debian", "docker"]),
-        (["wsl", "-d", "Debian", "sudo", "docker", "--version"], ["wsl", "-d", "Debian", "sudo", "docker"]),
-        (["wsl", "-d", "docker-desktop", "docker", "--version"], ["wsl", "-d", "docker-desktop", "docker"]),
-    ]
-
-    for test_cmd, docker_prefix in wsl_commands:
-        try:
-            logger.info(f"Trying WSL Docker: {' '.join(test_cmd)}")
-            result = subprocess.run(
-                test_cmd,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                timeout=30,  # Longer timeout for WSL startup
-                creationflags=_CREATION_FLAGS,
-            )
-            logger.info(f"WSL Docker result: returncode={result.returncode}, stdout={result.stdout[:100] if result.stdout else ''}, stderr={result.stderr[:100] if result.stderr else ''}")
-            if result.returncode == 0:
-                version = result.stdout.strip()
-                # Extract distro name for logging if using -d flag
-                distro = test_cmd[test_cmd.index("-d") + 1] if "-d" in test_cmd else "default"
-                logger.info(f"Docker found via WSL ({distro}): {version}")
-                # Cache the working command prefix for future use
-                _wsl_docker_command = docker_prefix
-                logger.info(f"Cached WSL Docker command: {_wsl_docker_command}")
-                return True, version
-            else:
-                logger.info(f"WSL Docker command failed: {result.stderr[:100] if result.stderr else 'no error'}")
-        except FileNotFoundError as e:
-            logger.info(f"WSL command not found: {e}")
-            return False, None
-        except subprocess.TimeoutExpired:
-            logger.info(f"WSL Docker command timed out: {test_cmd}")
-        except OSError as e:
-            logger.info(f"WSL Docker check error: {e}")
-        except Exception as e:
-            logger.exception(f"Unexpected error checking WSL Docker: {e}")
-
-    logger.info("All WSL Docker detection methods failed")
-    return False, None
-
-
-def _check_wsl_docker_running() -> bool:
-    """
-    Check if Docker daemon is running inside WSL.
-
-    Uses the cached WSL Docker command if available.
-
-    Returns:
-        True if Docker daemon is accessible via WSL
-    """
-    global _wsl_docker_command
-
-    if platform.system() != "Windows":
-        return False
-
-    # If we have a cached working command, try that first
-    if _wsl_docker_command:
-        try:
-            cmd = _wsl_docker_command + ["info"]
-            logger.info(f"Checking WSL Docker daemon with cached command: {' '.join(cmd)}")
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                timeout=30,
-                creationflags=_CREATION_FLAGS,
-            )
-            if result.returncode == 0:
-                logger.info(f"WSL Docker daemon running via cached command")
-                return True
-            else:
-                logger.info(f"WSL Docker daemon not running: {result.stderr[:100] if result.stderr else 'no error'}")
-        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
-            logger.debug(f"WSL Docker daemon check failed: {e}")
-        except Exception as e:
-            logger.exception(f"Unexpected error checking WSL Docker daemon: {e}")
-
-    # Fallback: try multiple approaches including specific distros and sudo
-    wsl_commands = [
-        ["wsl", "docker", "info"],
-        ["wsl", "sudo", "docker", "info"],
-        ["wsl", "-d", "Ubuntu", "docker", "info"],
-        ["wsl", "-d", "Ubuntu", "sudo", "docker", "info"],
-        ["wsl", "-d", "Ubuntu-22.04", "docker", "info"],
-        ["wsl", "-d", "Ubuntu-22.04", "sudo", "docker", "info"],
-        ["wsl", "-d", "Ubuntu-24.04", "docker", "info"],
-        ["wsl", "-d", "Ubuntu-24.04", "sudo", "docker", "info"],
-        ["wsl", "-d", "Debian", "docker", "info"],
-        ["wsl", "-d", "Debian", "sudo", "docker", "info"],
-    ]
-
-    for cmd in wsl_commands:
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                timeout=30,
-                creationflags=_CREATION_FLAGS,
-            )
-            if result.returncode == 0:
-                logger.info(f"WSL Docker daemon running via: {' '.join(cmd)}")
-                return True
-        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
-            logger.debug(f"WSL Docker daemon check failed for {cmd}: {e}")
-        except Exception as e:
-            logger.exception(f"Unexpected error checking WSL Docker daemon for {cmd}: {e}")
-
-    return False
-
-
-def _find_docker_executable() -> str | None:
-    """
-    Find the Docker executable path.
-
-    Checks in order:
-    1. Linux PATH first (works for WSL with Docker installed natively)
-    2. Linux standard paths: /usr/bin/docker, /usr/local/bin/docker
-    3. WSL Windows paths: /mnt/c/Program Files/Docker/...
-    4. Native Windows paths (for Windows host)
-    5. WSL Docker (for Windows with Docker in WSL2)
-
-    Returns:
-        Path to docker executable, or None if not found
-    """
-    current_platform = platform.system()
-    logger.info(f"Finding Docker executable - Platform: {current_platform}")
-
-    # First, try to find docker in PATH
-    docker_path = shutil.which("docker")
-    if docker_path:
-        logger.info(f"Docker found in PATH: {docker_path}")
-        return docker_path
-
-    logger.info("Docker not found in PATH, checking platform-specific locations")
-
-    # On Linux (including WSL), check standard Linux paths
-    if current_platform == "Linux":
-        linux_paths = [
-            Path("/usr/bin/docker"),
-            Path("/usr/local/bin/docker"),
-            Path("/snap/bin/docker"),
-        ]
-
-        for path in linux_paths:
-            if path.exists():
-                logger.info(f"Found Docker at: {path}")
-                return str(path)
-
-        # If running in WSL, also check Windows Docker Desktop paths via /mnt/c
-        if _is_wsl():
-            wsl_windows_paths = [
-                Path("/mnt/c/Program Files/Docker/Docker/resources/bin/docker.exe"),
-                Path("/mnt/c/Program Files/Docker/Docker/resources/bin/docker"),
-            ]
-
-            for path in wsl_windows_paths:
-                if path.exists():
-                    logger.info(f"Found Docker (WSL Windows) at: {path}")
-                    return str(path)
-
-    # On Windows, check common Docker Desktop installation paths
-    if current_platform == "Windows":
-        logger.info("Checking Windows Docker Desktop paths...")
-        common_paths = [
-            Path(os.environ.get("ProgramFiles", "C:\\Program Files"))
-            / "Docker"
-            / "Docker"
-            / "resources"
-            / "bin"
-            / "docker.exe",
-            Path(os.environ.get("LOCALAPPDATA", ""))
-            / "Docker"
-            / "wsl"
-            / "docker.exe",
-            Path(os.environ.get("ProgramW6432", "C:\\Program Files"))
-            / "Docker"
-            / "Docker"
-            / "resources"
-            / "bin"
-            / "docker.exe",
-        ]
-
-        for path in common_paths:
-            logger.info(f"Checking path: {path} - exists: {path.exists()}")
-            if path.exists():
-                logger.info(f"Found Docker at: {path}")
-                return str(path)
-
-        # Check if Docker is available via WSL
-        logger.info("Docker Desktop not found, checking WSL...")
-        try:
-            wsl_available, wsl_version = _check_wsl_docker()
-            if wsl_available:
-                logger.info(f"Using Docker via WSL: {wsl_version}")
-                return "wsl docker"  # Special marker for WSL Docker
-            logger.info("Docker not found via WSL either")
-        except Exception as e:
-            logger.exception(f"Error checking WSL Docker: {e}")
-
-    logger.info("Docker executable not found anywhere")
-    return None
-
-
-def _get_docker_command() -> list[str]:
-    """
-    Get the Docker command with proper path handling.
-
-    Returns:
-        List containing the docker command (may include full path on Windows,
-        or the cached WSL Docker command for WSL Docker on Windows)
-    """
-    global _wsl_docker_command
-
-    docker_path = _find_docker_executable()
-    if docker_path:
-        # Handle WSL Docker special case - use cached command if available
-        if docker_path == "wsl docker":
-            if _wsl_docker_command:
-                logger.info(f"Using cached WSL Docker command: {_wsl_docker_command}")
-                return _wsl_docker_command.copy()
-            # Fallback if cache not set (shouldn't happen)
-            return ["wsl", "docker"]
-        return [docker_path]
-
-    # Fall back to just "docker" and let subprocess handle it
-    return ["docker"]
-
-
-def _is_using_wsl_docker() -> bool:
-    """Check if we're using Docker via WSL."""
-    docker_path = _find_docker_executable()
-    return docker_path == "wsl docker"
-
-
-def _windows_to_wsl_path(windows_path: Path | str) -> str:
-    """
-    Convert a Windows path to a WSL path.
-
-    Example: C:\\Users\\name\\folder -> /mnt/c/Users/name/folder
-    """
-    path_str = str(windows_path)
-
-    # Handle UNC paths or already-unix paths
-    if path_str.startswith("/"):
-        return path_str
-
-    # Convert drive letter (e.g., C: -> /mnt/c)
-    if len(path_str) >= 2 and path_str[1] == ":":
-        drive = path_str[0].lower()
-        rest = path_str[2:].replace("\\", "/")
-        return f"/mnt/{drive}{rest}"
-
-    # Just convert backslashes
-    return path_str.replace("\\", "/")
-
-
-def _get_docker_host_ip() -> str | None:
-    """
-    Get the IP address that Docker containers can use to reach the host.
-
-    For Docker running in WSL, containers need to use the WSL gateway IP
-    instead of 'localhost' to reach services on the Windows host.
-
-    Returns:
-        The host IP address, or None if not determinable
-    """
-    # Check if we're running inside WSL (backend running in WSL)
-    if _is_wsl():
-        try:
-            # Get the WSL gateway IP directly
-            result = subprocess.run(
-                ["ip", "route"],
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                timeout=10,
-            )
-            if result.returncode == 0:
-                for line in result.stdout.split('\n'):
-                    if line.startswith('default via'):
-                        # Extract IP from "default via 192.168.x.x dev eth0"
-                        parts = line.split()
-                        if len(parts) >= 3:
-                            gateway_ip = parts[2]
-                            logger.info(f"[CloudDesigner] Running in WSL - gateway IP: {gateway_ip}")
-                            return gateway_ip
-        except Exception as e:
-            logger.warning(f"[CloudDesigner] Failed to get WSL gateway IP: {e}")
-
-    # Check if we're on Windows calling WSL Docker
-    use_wsl = _is_using_wsl_docker()
-    if use_wsl:
-        try:
-            docker_cmd = _get_docker_command()
-            # Get the default gateway inside WSL (this is the Windows host from WSL's perspective)
-            result = subprocess.run(
-                docker_cmd[:-1] + ["ip", "route"],  # Remove 'docker' from cmd, add 'ip route'
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                timeout=10,
-                creationflags=_CREATION_FLAGS,
-            )
-            if result.returncode == 0:
-                for line in result.stdout.split('\n'):
-                    if line.startswith('default via'):
-                        # Extract IP from "default via 192.168.x.x dev eth0"
-                        parts = line.split()
-                        if len(parts) >= 3:
-                            gateway_ip = parts[2]
-                            logger.info(f"[CloudDesigner] Detected WSL gateway IP: {gateway_ip}")
-                            return gateway_ip
-        except Exception as e:
-            logger.warning(f"[CloudDesigner] Failed to get WSL gateway IP: {e}")
-
-    # For Docker Desktop on Mac/Linux, try host.docker.internal
-    return "host.docker.internal"
-
-
-def _translate_localhost_url(url: str) -> str:
-    """
-    Translate a localhost URL to one that Docker containers can reach.
-
-    When running Docker (especially via WSL), containers cannot reach
-    'localhost' on the host. This function replaces localhost with the
-    appropriate host IP address.
-
-    Args:
-        url: The original URL (e.g., "http://localhost:8088")
-
-    Returns:
-        Translated URL (e.g., "http://192.168.48.1:8088") or original if no translation needed
-    """
-    from urllib.parse import urlparse, urlunparse
-
-    parsed = urlparse(url)
-    host = parsed.hostname or ""
-
-    # Check if this is a localhost URL that needs translation
-    if host.lower() in ("localhost", "127.0.0.1", "0.0.0.0"):
-        docker_host = _get_docker_host_ip()
-        if docker_host:
-            # Reconstruct URL with new host
-            # Handle port preservation
-            if parsed.port:
-                new_netloc = f"{docker_host}:{parsed.port}"
-            else:
-                new_netloc = docker_host
-
-            new_url = urlunparse((
-                parsed.scheme,
-                new_netloc,
-                parsed.path,
-                parsed.params,
-                parsed.query,
-                parsed.fragment
-            ))
-            logger.info(f"[CloudDesigner] Translated URL: {url} -> {new_url}")
-            return new_url
-
-    return url
-
-
-def _get_docker_files_path() -> Path:
-    """
-    Get the path to the Docker files directory.
-
-    Handles both development mode (source files) and bundled mode (PyInstaller).
-    """
-    # Check if running from PyInstaller bundle
-    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-        # Running from PyInstaller bundle
-        base_path = Path(sys._MEIPASS)
-        return base_path / "clouddesigner" / "docker_files"
-    else:
-        # Running from source
-        return Path(__file__).parent / "docker_files"
-
-ContainerStatus = Literal["running", "exited", "paused", "not_created", "unknown"]
-
-
-@dataclass
-class DockerStatus:
-    """Docker daemon status"""
-
-    installed: bool
-    running: bool
-    version: str | None = None
-    docker_path: str | None = None
-
-
-@dataclass
-class CloudDesignerStatus:
-    """CloudDesigner container status"""
-
-    status: ContainerStatus
-    port: int | None = None
-    error: str | None = None
 
 
 class CloudDesignerManager:
@@ -521,12 +42,12 @@ class CloudDesignerManager:
     DEFAULT_PORT = 8080
 
     def __init__(self):
-        self.compose_dir = _get_docker_files_path()
+        self.compose_dir = get_docker_files_path()
 
     def check_docker_installed(self) -> bool:
         """Check if docker command is available."""
         try:
-            docker_cmd = _get_docker_command()
+            docker_cmd = get_docker_command()
             logger.debug(f"Checking Docker installed with command: {docker_cmd}")
             result = subprocess.run(
                 docker_cmd + ["--version"],
@@ -535,7 +56,7 @@ class CloudDesignerManager:
                 encoding='utf-8',
                 errors='replace',
                 timeout=30,  # Longer timeout for WSL startup
-                creationflags=_CREATION_FLAGS,
+                creationflags=CREATION_FLAGS,
             )
             if result.returncode == 0:
                 logger.info(f"Docker installed: {result.stdout.strip()}")
@@ -550,7 +71,7 @@ class CloudDesignerManager:
     def check_docker_running(self) -> bool:
         """Check if Docker daemon is running."""
         try:
-            docker_cmd = _get_docker_command()
+            docker_cmd = get_docker_command()
             logger.debug(f"Checking Docker running with command: {docker_cmd}")
             result = subprocess.run(
                 docker_cmd + ["info"],
@@ -559,7 +80,7 @@ class CloudDesignerManager:
                 encoding='utf-8',
                 errors='replace',
                 timeout=45,  # Longer timeout for WSL2 startup
-                creationflags=_CREATION_FLAGS,
+                creationflags=CREATION_FLAGS,
             )
             if result.returncode == 0:
                 logger.info("Docker daemon is running")
@@ -574,7 +95,7 @@ class CloudDesignerManager:
     def get_docker_version(self) -> str | None:
         """Get Docker version string."""
         try:
-            docker_cmd = _get_docker_command()
+            docker_cmd = get_docker_command()
             result = subprocess.run(
                 docker_cmd + ["--version"],
                 capture_output=True,
@@ -582,7 +103,7 @@ class CloudDesignerManager:
                 encoding='utf-8',
                 errors='replace',
                 timeout=30,  # Longer timeout for WSL
-                creationflags=_CREATION_FLAGS,
+                creationflags=CREATION_FLAGS,
             )
             if result.returncode == 0:
                 # Parse "Docker version 24.0.7, build afdd53b"
@@ -595,7 +116,7 @@ class CloudDesignerManager:
     def get_docker_status(self) -> DockerStatus:
         """Get comprehensive Docker status."""
         logger.info("Checking Docker status...")
-        docker_path = _find_docker_executable()
+        docker_path = find_docker_executable()
         logger.info(f"Docker path: {docker_path}")
 
         installed = self.check_docker_installed()
@@ -621,7 +142,7 @@ class CloudDesignerManager:
     def get_container_status(self) -> CloudDesignerStatus:
         """Check clouddesigner-desktop container status."""
         try:
-            docker_cmd = _get_docker_command()
+            docker_cmd = get_docker_command()
             result = subprocess.run(
                 docker_cmd
                 + [
@@ -635,7 +156,7 @@ class CloudDesignerManager:
                 encoding='utf-8',
                 errors='replace',
                 timeout=15,
-                creationflags=_CREATION_FLAGS,
+                creationflags=CREATION_FLAGS,
             )
 
             if result.returncode != 0:
@@ -699,7 +220,7 @@ class CloudDesignerManager:
 
         # Translate localhost URLs for Docker container connectivity
         # Containers can't reach 'localhost' on the host, need to use host IP
-        docker_gateway_url = _translate_localhost_url(gateway_url)
+        docker_gateway_url = translate_localhost_url(gateway_url)
         env["IGNITION_GATEWAY_URL"] = docker_gateway_url
 
         # Fetch credentials from vault if credential_name is provided
@@ -713,9 +234,9 @@ class CloudDesignerManager:
                 if credential:
                     env["IGNITION_USERNAME"] = credential.username
                     env["IGNITION_PASSWORD"] = credential.password
-                    logger.info(f"[CloudDesigner] ✓ Loaded credentials for '{credential_name}' (user: {credential.username})")
+                    logger.info(f"[CloudDesigner] Loaded credentials for '{credential_name}' (user: {credential.username})")
                 else:
-                    logger.warning(f"[CloudDesigner] ✗ Credential '{credential_name}' not found in vault")
+                    logger.warning(f"[CloudDesigner] Credential '{credential_name}' not found in vault")
             except Exception as e:
                 logger.exception(f"[CloudDesigner] Failed to load credentials: {e}")
 
@@ -724,15 +245,15 @@ class CloudDesignerManager:
             logger.info(f"[CloudDesigner] Starting CloudDesigner with gateway: {gateway_url}")
             logger.info(f"[CloudDesigner] ========================================")
 
-            docker_cmd = _get_docker_command()
+            docker_cmd = get_docker_command()
             logger.info(f"[CloudDesigner] Using docker command: {' '.join(docker_cmd)}")
 
             # Determine if we need WSL path conversion
-            use_wsl = _is_using_wsl_docker()
+            use_wsl = is_using_wsl_docker()
             compose_file = self.compose_dir / "docker-compose.yml"
 
             if use_wsl:
-                wsl_compose_file = _windows_to_wsl_path(compose_file)
+                wsl_compose_file = windows_to_wsl_path(compose_file)
                 # Note: Do NOT quote the path - subprocess passes arguments directly
                 # without shell interpretation, so quotes become literal characters
                 compose_args = ["compose", "-f", wsl_compose_file]
@@ -756,12 +277,12 @@ class CloudDesignerManager:
                 encoding='utf-8',
                 errors='replace',
                 timeout=60,
-                creationflags=_CREATION_FLAGS,
+                creationflags=CREATION_FLAGS,
             )
             if cleanup_result.returncode != 0:
                 logger.warning(f"[CloudDesigner] Cleanup warning (continuing): {cleanup_result.stderr[:200] if cleanup_result.stderr else 'none'}")
             else:
-                logger.info("[CloudDesigner] ✓ Step 1 complete: Cleanup successful")
+                logger.info("[CloudDesigner] Step 1 complete: Cleanup successful")
 
             # Step 2: Remove cached guacamole image
             logger.info("[CloudDesigner] ----------------------------------------")
@@ -774,12 +295,12 @@ class CloudDesignerManager:
                 encoding='utf-8',
                 errors='replace',
                 timeout=30,
-                creationflags=_CREATION_FLAGS,
+                creationflags=CREATION_FLAGS,
             )
             if rmi_result.returncode != 0:
-                logger.info("[CloudDesigner] ✓ Step 2 complete: No cached image (this is OK)")
+                logger.info("[CloudDesigner] Step 2 complete: No cached image (this is OK)")
             else:
-                logger.info("[CloudDesigner] ✓ Step 2 complete: Guacamole image removed")
+                logger.info("[CloudDesigner] Step 2 complete: Guacamole image removed")
 
             # Step 3: Build designer-desktop image
             logger.info("[CloudDesigner] ----------------------------------------")
@@ -800,7 +321,7 @@ class CloudDesignerManager:
                 text=True,
                 encoding='utf-8',
                 errors='replace',
-                creationflags=_CREATION_FLAGS,
+                creationflags=CREATION_FLAGS,
             )
 
             # Stream build output to logs
@@ -837,7 +358,7 @@ class CloudDesignerManager:
                     "error": f"Docker build failed (exit code {build_process.returncode}). Check logs for details.",
                     "output": error_output,
                 }
-            logger.info("[CloudDesigner] ✓ Step 3 complete: Image built successfully")
+            logger.info("[CloudDesigner] Step 3 complete: Image built successfully")
 
             # Step 4: Start containers
             logger.info("[CloudDesigner] ----------------------------------------")
@@ -853,18 +374,17 @@ class CloudDesignerManager:
                 encoding='utf-8',
                 errors='replace',
                 timeout=300,
-                creationflags=_CREATION_FLAGS,
+                creationflags=CREATION_FLAGS,
             )
 
             if result.returncode == 0:
-                logger.info("[CloudDesigner] ✓ Step 4 complete: Containers started")
+                logger.info("[CloudDesigner] Step 4 complete: Containers started")
                 logger.info("[CloudDesigner] ========================================")
                 logger.info("[CloudDesigner] SUCCESS! CloudDesigner is starting up")
                 logger.info("[CloudDesigner] Access at: http://localhost:8080")
                 logger.info("[CloudDesigner] ========================================")
 
                 # Wait a moment and check container health
-                import time
                 time.sleep(3)
                 container_status = self.get_container_status()
                 logger.info(f"[CloudDesigner] Container status after startup: {container_status.status}")
@@ -886,7 +406,7 @@ class CloudDesignerManager:
                         encoding='utf-8',
                         errors='replace',
                         timeout=30,
-                        creationflags=_CREATION_FLAGS,
+                        creationflags=CREATION_FLAGS,
                     )
                     if logs_result.stdout:
                         logger.error(f"[CloudDesigner] Container logs:\n{logs_result.stdout}")
@@ -933,14 +453,14 @@ class CloudDesignerManager:
 
         try:
             logger.info("Stopping CloudDesigner stack")
-            docker_cmd = _get_docker_command()
+            docker_cmd = get_docker_command()
 
             # Handle WSL path conversion
-            use_wsl = _is_using_wsl_docker()
+            use_wsl = is_using_wsl_docker()
             compose_file = self.compose_dir / "docker-compose.yml"
 
             if use_wsl:
-                wsl_compose_file = _windows_to_wsl_path(compose_file)
+                wsl_compose_file = windows_to_wsl_path(compose_file)
                 # Note: Do NOT quote the path - subprocess passes arguments directly
                 # without shell interpretation, so quotes become literal characters
                 compose_args = ["compose", "-f", wsl_compose_file]
@@ -957,7 +477,7 @@ class CloudDesignerManager:
                 encoding='utf-8',
                 errors='replace',
                 timeout=60,
-                creationflags=_CREATION_FLAGS,
+                creationflags=CREATION_FLAGS,
             )
 
             if result.returncode == 0:
@@ -1007,14 +527,14 @@ class CloudDesignerManager:
             }
 
         cleanup_results = []
-        docker_cmd = _get_docker_command()
+        docker_cmd = get_docker_command()
 
         # Handle WSL path conversion
-        use_wsl = _is_using_wsl_docker()
+        use_wsl = is_using_wsl_docker()
         compose_file = self.compose_dir / "docker-compose.yml"
 
         if use_wsl:
-            wsl_compose_file = _windows_to_wsl_path(compose_file)
+            wsl_compose_file = windows_to_wsl_path(compose_file)
             # Note: Do NOT quote the path - subprocess passes arguments directly
             # without shell interpretation, so quotes become literal characters
             compose_args = ["compose", "-f", wsl_compose_file]
@@ -1036,7 +556,7 @@ class CloudDesignerManager:
                 encoding='utf-8',
                 errors='replace',
                 timeout=120,
-                creationflags=_CREATION_FLAGS,
+                creationflags=CREATION_FLAGS,
             )
             cleanup_results.append(f"compose down: {'OK' if result.returncode == 0 else result.stderr[:100]}")
 
@@ -1056,7 +576,7 @@ class CloudDesignerManager:
                     encoding='utf-8',
                     errors='replace',
                     timeout=30,
-                    creationflags=_CREATION_FLAGS,
+                    creationflags=CREATION_FLAGS,
                 )
                 if result.returncode == 0:
                     cleanup_results.append(f"rm {container}: removed")
@@ -1070,7 +590,7 @@ class CloudDesignerManager:
                 encoding='utf-8',
                 errors='replace',
                 timeout=30,
-                creationflags=_CREATION_FLAGS,
+                creationflags=CREATION_FLAGS,
             )
             if result.returncode == 0:
                 cleanup_results.append("network: removed")
@@ -1090,7 +610,7 @@ class CloudDesignerManager:
                     encoding='utf-8',
                     errors='replace',
                     timeout=30,
-                    creationflags=_CREATION_FLAGS,
+                    creationflags=CREATION_FLAGS,
                 )
                 if result.returncode == 0:
                     cleanup_results.append(f"volume {volume}: removed")
@@ -1111,7 +631,7 @@ class CloudDesignerManager:
                     encoding='utf-8',
                     errors='replace',
                     timeout=60,
-                    creationflags=_CREATION_FLAGS,
+                    creationflags=CREATION_FLAGS,
                 )
                 if result.returncode == 0:
                     cleanup_results.append(f"image {image}: removed")
