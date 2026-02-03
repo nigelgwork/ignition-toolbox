@@ -435,6 +435,106 @@ async def update_playbook_metadata(request: PlaybookMetadataUpdateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class PlaybookDuplicateRequest(BaseModel):
+    """Request to duplicate a playbook"""
+    playbook_path: str  # Relative path of playbook to duplicate
+    new_name: str | None = None  # Optional new name (defaults to "Original Name (Copy)")
+
+
+@router.post("/duplicate")
+async def duplicate_playbook(request: PlaybookDuplicateRequest):
+    """
+    Duplicate a playbook to the user playbooks directory.
+
+    Creates a copy of the playbook with "(Copy)" suffix in the name.
+    The new playbook is saved to the user-installed playbooks directory.
+    """
+    metadata_store = get_metadata_store()
+    try:
+        # Validate source path
+        source_path = validate_playbook_path(request.playbook_path)
+
+        if not source_path.exists():
+            raise HTTPException(status_code=404, detail="Source playbook not found")
+
+        # Load original playbook
+        with open(source_path, encoding='utf-8') as f:
+            playbook_data = yaml.safe_load(f)
+
+        original_name = playbook_data.get("name", "Untitled")
+
+        # Set new name
+        if request.new_name:
+            new_name = request.new_name
+        else:
+            new_name = f"{original_name} (Copy)"
+
+        playbook_data["name"] = new_name
+
+        # Remove verified status from copy (user must verify their modifications)
+        if "verified" in playbook_data:
+            del playbook_data["verified"]
+        if "metadata" in playbook_data and "verified" in playbook_data["metadata"]:
+            del playbook_data["metadata"]["verified"]
+
+        # Determine destination path in user playbooks directory
+        user_dir = get_user_playbooks_dir()
+        user_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create filename from new name (sanitize for filesystem)
+        safe_name = "".join(c if c.isalnum() or c in "._- " else "_" for c in new_name)
+        safe_name = safe_name.strip().replace(" ", "_")
+
+        # Preserve subdirectory structure if original is in a subdomain folder
+        source_relative = Path(request.playbook_path)
+        if len(source_relative.parts) > 1:
+            # Has subdirectory (e.g., "gateway/backup.yaml")
+            dest_subdir = user_dir / source_relative.parent
+            dest_subdir.mkdir(parents=True, exist_ok=True)
+            dest_path = dest_subdir / f"{safe_name}.yaml"
+        else:
+            dest_path = user_dir / f"{safe_name}.yaml"
+
+        # Ensure unique filename
+        counter = 1
+        original_dest_path = dest_path
+        while dest_path.exists():
+            stem = original_dest_path.stem
+            dest_path = original_dest_path.with_name(f"{stem}_{counter}.yaml")
+            counter += 1
+
+        # Write new playbook
+        with open(dest_path, "w", encoding='utf-8') as f:
+            yaml.safe_dump(playbook_data, f, default_flow_style=False, sort_keys=False)
+
+        # Calculate relative path for metadata
+        relative_path = str(dest_path.relative_to(user_dir)).replace("\\", "/")
+
+        # Update metadata store
+        meta = metadata_store.get_metadata(relative_path)
+        meta.origin = "user-installed"
+        meta.duplicated_from = request.playbook_path
+        meta.created_at = datetime.now().isoformat()
+        meta.verified = False  # User must verify their modifications
+        metadata_store.update_metadata(relative_path, meta)
+
+        logger.info(f"Duplicated playbook: {source_path} -> {dest_path}")
+
+        return {
+            "status": "success",
+            "original_path": request.playbook_path,
+            "new_path": relative_path,
+            "new_name": new_name,
+            "message": f"Playbook duplicated successfully as '{new_name}'",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error duplicating playbook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/edit-step")
 async def edit_step(request: StepEditRequest):
     """Edit a step's parameters in a playbook during execution"""

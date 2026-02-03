@@ -149,9 +149,15 @@ export const api = {
         { method: 'DELETE' }
       ),
     duplicate: (path: string, newName?: string) =>
-      fetchJSON<{ status: string; message: string; source_path: string; new_path: string; playbook: any }>(
-        `/api/playbooks/${encodeURIComponent(path)}/duplicate${newName ? `?new_name=${encodeURIComponent(newName)}` : ''}`,
-        { method: 'POST' }
+      fetchJSON<{ status: string; message: string; original_path: string; new_path: string; new_name: string }>(
+        '/api/playbooks/duplicate',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            playbook_path: path,
+            new_name: newName || undefined,
+          }),
+        }
       ),
     export: (path: string) =>
       fetchJSON<{ name: string; path: string; version: string; description: string; domain: string; yaml_content: string; metadata: any }>(
