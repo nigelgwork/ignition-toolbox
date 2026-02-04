@@ -74,6 +74,12 @@ const healthStatusConfig: Record<HealthStatus, { color: 'success' | 'warning' | 
   unknown: { color: 'default', icon: <WarningIcon /> },
 };
 
+// Safe accessor for health status config - falls back to 'unknown' for unexpected values
+const getHealthConfig = (status: string | undefined | null) => {
+  const validStatus = status && status in healthStatusConfig ? status as HealthStatus : 'unknown';
+  return healthStatusConfig[validStatus];
+};
+
 export function DiagnosticsPanel() {
   // Logs state
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -294,9 +300,9 @@ export function DiagnosticsPanel() {
             <Stack spacing={2}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Chip
-                  icon={healthStatusConfig[health.status].icon}
-                  label={health.status.charAt(0).toUpperCase() + health.status.slice(1)}
-                  color={healthStatusConfig[health.status].color}
+                  icon={getHealthConfig(health.status).icon}
+                  label={(health.status || 'unknown').charAt(0).toUpperCase() + (health.status || 'unknown').slice(1)}
+                  color={getHealthConfig(health.status).color}
                   size="small"
                 />
                 <Typography variant="body2" color="text.secondary">
@@ -306,7 +312,7 @@ export function DiagnosticsPanel() {
 
               {/* Component Status Grid */}
               <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1.5 }}>
-                {Object.entries(health.components).map(([name, component]) => (
+                {Object.entries(health.components || {}).map(([name, component]) => (
                   <Paper
                     key={name}
                     variant="outlined"
@@ -315,11 +321,11 @@ export function DiagnosticsPanel() {
                       display: 'flex',
                       alignItems: 'center',
                       gap: 1,
-                      borderColor: component.status === 'healthy' ? 'success.main' :
-                                   component.status === 'degraded' ? 'warning.main' : 'error.main',
+                      borderColor: component?.status === 'healthy' ? 'success.main' :
+                                   component?.status === 'degraded' ? 'warning.main' : 'error.main',
                     }}
                   >
-                    {healthStatusConfig[component.status].icon}
+                    {getHealthConfig(component?.status).icon}
                     <Box>
                       <Typography variant="body2" fontWeight="medium" sx={{ textTransform: 'capitalize' }}>
                         {name}

@@ -115,15 +115,15 @@ class CloudDesignerManager:
 
     def get_docker_status(self) -> DockerStatus:
         """Get comprehensive Docker status."""
-        logger.info("Checking Docker status...")
+        logger.debug("Checking Docker status...")
         docker_path = find_docker_executable()
-        logger.info(f"Docker path: {docker_path}")
+        logger.debug(f"Docker path: {docker_path}")
 
         installed = self.check_docker_installed()
-        logger.info(f"Docker installed: {installed}")
+        logger.debug(f"Docker installed: {installed}")
 
         running = self.check_docker_running() if installed else False
-        logger.info(f"Docker running: {running}")
+        logger.debug(f"Docker running: {running}")
 
         version = self.get_docker_version() if installed else None
 
