@@ -132,9 +132,15 @@
 
 ### 2.3 Frontend Tests (~15h)
 
-- [ ] Add Vitest configuration
-- [ ] Test critical components (PlaybookCard, ExecutionStepper)
+- [x] Add Vitest configuration ✅ DONE (v1.4.68)
+  - vitest.config.ts with jsdom environment
+  - Test setup with @testing-library/react
+  - localStorage and ResizeObserver mocks
+- [x] Test WelcomeDialog component (6 tests)
+- [x] Test logger utility (5 tests)
+- [x] Test Zustand store (16 tests)
 - [ ] Test hooks (useWebSocket, useExecution)
+- [ ] Test more components (PlaybookCard, ExecutionStepper)
 - [ ] Effort: 15h
 
 ---
