@@ -84,7 +84,7 @@ class TestCatalogEndpoints:
 
     def test_get_ignition_versions(self):
         """Test GET /api/stackbuilder/versions/ignition returns version list."""
-        with patch('ignition_toolkit.api.routers.stackbuilder._get_ignition_versions') as mock_versions:
+        with patch('ignition_toolkit.api.routers.stackbuilder.main._get_ignition_versions') as mock_versions:
             mock_versions.return_value = ["latest", "8.3.2", "8.3.1", "8.1.45"]
             response = client.get("/api/stackbuilder/versions/ignition")
             assert response.status_code == 200
@@ -94,7 +94,7 @@ class TestCatalogEndpoints:
 
     def test_get_postgres_versions(self):
         """Test GET /api/stackbuilder/versions/postgres returns version list."""
-        with patch('ignition_toolkit.api.routers.stackbuilder._get_postgres_versions') as mock_versions:
+        with patch('ignition_toolkit.api.routers.stackbuilder.main._get_postgres_versions') as mock_versions:
             mock_versions.return_value = ["latest", "16-alpine", "15-alpine"]
             response = client.get("/api/stackbuilder/versions/postgres")
             assert response.status_code == 200
@@ -263,7 +263,7 @@ class TestSavedStacksCRUD:
     @pytest.fixture(autouse=True)
     def mock_database_operations(self):
         """Mock database operations for saved stack tests."""
-        with patch('ignition_toolkit.api.routers.stackbuilder.get_database') as mock_get_db:
+        with patch('ignition_toolkit.api.routers.stackbuilder.main.get_database') as mock_get_db:
             mock_session = MagicMock()
             mock_db = MagicMock()
             mock_db.session_scope.return_value.__enter__ = MagicMock(return_value=mock_session)
@@ -307,7 +307,7 @@ class TestSavedStacksCRUD:
         }
 
         # Mock SavedStackModel constructor
-        with patch('ignition_toolkit.api.routers.stackbuilder.SavedStackModel') as MockModel:
+        with patch('ignition_toolkit.api.routers.stackbuilder.main.SavedStackModel') as MockModel:
             MockModel.return_value = mock_stack
 
             stack_data = {
