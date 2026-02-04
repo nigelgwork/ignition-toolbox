@@ -22,6 +22,7 @@ import {
   InputLabel,
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { HelpTooltip } from './HelpTooltip';
 
 export interface AICredentialCreate {
   name: string;
@@ -137,42 +138,48 @@ export function AddAICredentialDialog({
               disabled={isLoading}
             />
 
-            <FormControl fullWidth disabled={isLoading}>
-              <InputLabel>Provider</InputLabel>
-              <Select
-                value={provider}
-                label="Provider"
-                onChange={(e) => handleProviderChange(e.target.value)}
-              >
-                <MenuItem value="openai">OpenAI</MenuItem>
-                <MenuItem value="anthropic">Anthropic (Claude)</MenuItem>
-                <MenuItem value="gemini">Google Gemini</MenuItem>
-                <MenuItem value="local">Local LLM</MenuItem>
-              </Select>
-            </FormControl>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+              <FormControl fullWidth disabled={isLoading}>
+                <InputLabel>Provider</InputLabel>
+                <Select
+                  value={provider}
+                  label="Provider"
+                  onChange={(e) => handleProviderChange(e.target.value)}
+                >
+                  <MenuItem value="openai">OpenAI</MenuItem>
+                  <MenuItem value="anthropic">Anthropic (Claude)</MenuItem>
+                  <MenuItem value="gemini">Google Gemini</MenuItem>
+                  <MenuItem value="local">Local LLM</MenuItem>
+                </Select>
+              </FormControl>
+              <HelpTooltip content="OpenAI: ChatGPT models (gpt-4, gpt-3.5). Anthropic: Claude models. Google Gemini: Google's AI. Local LLM: Self-hosted models via LM Studio, Ollama, etc." />
+            </Box>
 
-            <TextField
-              label="API Key"
-              type={showApiKey ? 'text' : 'password'}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              required
-              fullWidth
-              disabled={isLoading}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      edge="end"
-                    >
-                      {showApiKey ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
+            <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+              <TextField
+                label="API Key"
+                type={showApiKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                required
+                fullWidth
+                disabled={isLoading}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        edge="end"
+                      >
+                        {showApiKey ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <HelpTooltip content="Your secret API key from the provider's dashboard. This is stored encrypted and never logged. Treat it like a password - don't share it." />
+            </Box>
 
             {provider === 'local' && (
               <TextField
@@ -186,31 +193,38 @@ export function AddAICredentialDialog({
               />
             )}
 
-            <FormControl fullWidth disabled={isLoading}>
-              <InputLabel>Model Name</InputLabel>
-              <Select
-                value={modelName}
-                label="Model Name"
-                onChange={(e) => setModelName(e.target.value)}
-              >
-                {getValidModels(provider).map((model) => (
-                  <MenuItem key={model} value={model}>
-                    {model}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+              <FormControl fullWidth disabled={isLoading}>
+                <InputLabel>Model Name</InputLabel>
+                <Select
+                  value={modelName}
+                  label="Model Name"
+                  onChange={(e) => setModelName(e.target.value)}
+                >
+                  {getValidModels(provider).map((model) => (
+                    <MenuItem key={model} value={model}>
+                      {model}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <HelpTooltip content="Different models have different capabilities and costs. Larger models (gpt-4, claude-3-opus) are more capable but slower and more expensive. Smaller models are faster and cheaper." />
+            </Box>
 
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={enabled}
-                  onChange={(e) => setEnabled(e.target.checked)}
-                  disabled={isLoading}
-                />
-              }
-              label="Enable AI Assistant"
-            />
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={enabled}
+                    onChange={(e) => setEnabled(e.target.checked)}
+                    disabled={isLoading}
+                  />
+                }
+                label="Enable AI Assistant"
+                sx={{ flex: 1 }}
+              />
+              <HelpTooltip content="When enabled, this credential is available for AI-powered features like execution debugging and playbook suggestions. Disable to save the credential without using it." />
+            </Box>
 
             {error && (
               <Alert severity="error" sx={{ mt: 1 }}>

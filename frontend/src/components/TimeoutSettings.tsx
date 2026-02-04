@@ -13,6 +13,7 @@ import {
   InputAdornment,
 } from '@mui/material';
 import { ExpandMore as ExpandMoreIcon, Timer as TimerIcon } from '@mui/icons-material';
+import { HelpTooltip } from './HelpTooltip';
 import type { TimeoutOverrides } from '../types/api';
 
 interface TimeoutSettingsProps {
@@ -89,42 +90,54 @@ export function TimeoutSettings({ timeoutOverrides, onChange }: TimeoutSettingsP
       </AccordionSummary>
       <AccordionDetails sx={{ padding: '8px 0 16px 0' }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <TextField
-            label={`Gateway Restart (default: ${DEFAULTS.gateway_restart}s)`}
-            type="number"
-            size="small"
-            value={getValue('gateway_restart')}
-            onChange={(e) => handleChange('gateway_restart', e.target.value)}
-            helperText="Time to wait for gateway to restart and become ready"
-            InputProps={{
-              endAdornment: <InputAdornment position="end">seconds</InputAdornment>,
-              inputProps: { min: 1 },
-            }}
-          />
-          <TextField
-            label={`Module Installation (default: ${DEFAULTS.module_install}s)`}
-            type="number"
-            size="small"
-            value={getValue('module_install')}
-            onChange={(e) => handleChange('module_install', e.target.value)}
-            helperText="Time to wait for module installation to complete"
-            InputProps={{
-              endAdornment: <InputAdornment position="end">seconds</InputAdornment>,
-              inputProps: { min: 1 },
-            }}
-          />
-          <TextField
-            label={`Browser Operations (default: ${DEFAULTS.browser_operation}ms)`}
-            type="number"
-            size="small"
-            value={getValue('browser_operation')}
-            onChange={(e) => handleChange('browser_operation', e.target.value)}
-            helperText="Time for browser clicks, fills, and waits"
-            InputProps={{
-              endAdornment: <InputAdornment position="end">ms</InputAdornment>,
-              inputProps: { min: 100 },
-            }}
-          />
+          <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+            <TextField
+              label={`Gateway Restart (default: ${DEFAULTS.gateway_restart}s)`}
+              type="number"
+              size="small"
+              fullWidth
+              value={getValue('gateway_restart')}
+              onChange={(e) => handleChange('gateway_restart', e.target.value)}
+              helperText="Time to wait for gateway to restart and become ready"
+              InputProps={{
+                endAdornment: <InputAdornment position="end">seconds</InputAdornment>,
+                inputProps: { min: 1 },
+              }}
+            />
+            <HelpTooltip content="How long to wait after triggering a gateway restart before timing out. Increase this if your gateway takes longer than 2 minutes to restart (e.g., large projects or slow hardware)." />
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+            <TextField
+              label={`Module Installation (default: ${DEFAULTS.module_install}s)`}
+              type="number"
+              size="small"
+              fullWidth
+              value={getValue('module_install')}
+              onChange={(e) => handleChange('module_install', e.target.value)}
+              helperText="Time to wait for module installation to complete"
+              InputProps={{
+                endAdornment: <InputAdornment position="end">seconds</InputAdornment>,
+                inputProps: { min: 1 },
+              }}
+            />
+            <HelpTooltip content="Maximum time allowed for module upload and installation. Large modules or slow systems may need more time. The default 5 minutes is usually sufficient." />
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+            <TextField
+              label={`Browser Operations (default: ${DEFAULTS.browser_operation}ms)`}
+              type="number"
+              size="small"
+              fullWidth
+              value={getValue('browser_operation')}
+              onChange={(e) => handleChange('browser_operation', e.target.value)}
+              helperText="Time for browser clicks, fills, and waits"
+              InputProps={{
+                endAdornment: <InputAdornment position="end">ms</InputAdornment>,
+                inputProps: { min: 100 },
+              }}
+            />
+            <HelpTooltip content="Timeout for individual browser actions like clicking buttons, filling forms, or waiting for elements. Increase for slow networks or when pages take longer to load. Value is in milliseconds (1000ms = 1 second)." />
+          </Box>
           <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
             Leave empty to use default values shown in labels.
           </Typography>

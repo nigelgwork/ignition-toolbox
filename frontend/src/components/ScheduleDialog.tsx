@@ -17,6 +17,7 @@ import {
   Alert,
 } from '@mui/material';
 import type { PlaybookInfo } from '../types/api';
+import { HelpTooltip } from './HelpTooltip';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('ScheduleDialog');
@@ -184,32 +185,38 @@ export default function ScheduleDialog({
           />
 
           {/* Schedule Type */}
-          <FormControl fullWidth>
-            <InputLabel>Schedule Type</InputLabel>
-            <Select
-              value={scheduleType}
-              label="Schedule Type"
-              onChange={(e) => setScheduleType(e.target.value as ScheduleType)}
-            >
-              <MenuItem value="interval">Interval (every X minutes)</MenuItem>
-              <MenuItem value="daily">Daily (specific time)</MenuItem>
-              <MenuItem value="weekly">Weekly (specific days)</MenuItem>
-              <MenuItem value="monthly">Monthly (specific day)</MenuItem>
-              <MenuItem value="cron">Advanced (cron expression)</MenuItem>
-            </Select>
-          </FormControl>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+            <FormControl fullWidth>
+              <InputLabel>Schedule Type</InputLabel>
+              <Select
+                value={scheduleType}
+                label="Schedule Type"
+                onChange={(e) => setScheduleType(e.target.value as ScheduleType)}
+              >
+                <MenuItem value="interval">Interval (every X minutes)</MenuItem>
+                <MenuItem value="daily">Daily (specific time)</MenuItem>
+                <MenuItem value="weekly">Weekly (specific days)</MenuItem>
+                <MenuItem value="monthly">Monthly (specific day)</MenuItem>
+                <MenuItem value="cron">Advanced (cron expression)</MenuItem>
+              </Select>
+            </FormControl>
+            <HelpTooltip content="Choose how often to run this playbook: Interval runs repeatedly, Daily/Weekly/Monthly run at specific times, or use Cron for complex schedules." />
+          </Box>
 
           {/* Interval Settings */}
           {scheduleType === 'interval' && (
-            <TextField
-              label="Interval (minutes)"
-              type="number"
-              value={intervalMinutes}
-              onChange={(e) => setIntervalMinutes(Math.max(1, parseInt(e.target.value) || 1))}
-              fullWidth
-              inputProps={{ min: 1 }}
-              helperText="Run every X minutes"
-            />
+            <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+              <TextField
+                label="Interval (minutes)"
+                type="number"
+                value={intervalMinutes}
+                onChange={(e) => setIntervalMinutes(Math.max(1, parseInt(e.target.value) || 1))}
+                fullWidth
+                inputProps={{ min: 1 }}
+                helperText="Run every X minutes"
+              />
+              <HelpTooltip content="Minimum recommended: 5 minutes. Very short intervals may cause overlapping executions if the playbook takes longer to complete than the interval." />
+            </Box>
           )}
 
           {/* Daily Settings */}
@@ -228,9 +235,12 @@ export default function ScheduleDialog({
           {/* Weekly Settings */}
           {scheduleType === 'weekly' && (
             <Box>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Select Days of Week
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Select Days of Week
+                </Typography>
+                <HelpTooltip size="small" content="Select one or more days. The playbook will run at the specified time on each selected day." />
+              </Box>
               <ToggleButtonGroup
                 value={selectedDays}
                 onChange={handleDaysChange}
@@ -260,16 +270,18 @@ export default function ScheduleDialog({
           {/* Monthly Settings */}
           {scheduleType === 'monthly' && (
             <Box>
-              <TextField
-                label="Day of Month"
-                type="number"
-                value={dayOfMonth}
-                onChange={(e) => setDayOfMonth(Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
-                fullWidth
-                inputProps={{ min: 1, max: 31 }}
-                helperText="Day of the month (1-31)"
-                sx={{ mb: 2 }}
-              />
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
+                <TextField
+                  label="Day of Month"
+                  type="number"
+                  value={dayOfMonth}
+                  onChange={(e) => setDayOfMonth(Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
+                  fullWidth
+                  inputProps={{ min: 1, max: 31 }}
+                  helperText="Day of the month (1-31)"
+                />
+                <HelpTooltip content="For months with fewer days (e.g., February), the playbook runs on the last day of the month if the specified day doesn't exist." />
+              </Box>
 
               <TextField
                 label="Time"

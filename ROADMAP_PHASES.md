@@ -200,10 +200,22 @@
   - Database and storage statistics
   - Data cleanup functionality with preview
   - Log export to file
-- [ ] Add inline help tooltips to complex fields
+- [x] Add inline help tooltips to complex fields ✅ DONE (v1.4.71)
+  - TimeoutSettings: Gateway restart, module installation, browser operations
+  - AddCredentialDialog: Name, Gateway URL, Session Only toggle
+  - EditCredentialDialog: Password field
+  - GlobalCredentialSelector: Auto-fill behavior
+  - ParameterInput: Credential selects, path fields, boolean parameters
+  - ScheduleDialog: Schedule type, interval, weekly days, monthly day
+  - AddAICredentialDialog: Provider, API key, model name, enable toggle
 - [ ] Improve error messages with recovery hints
-- [ ] Add step-by-step execution timeline view
-- [ ] Effort: 20h
+- [x] Add step-by-step execution timeline view ✅ DONE (v1.4.71)
+  - ExecutionTimeline component with visual timeline connector
+  - Duration bars and step timing display
+  - Expandable step details with error/output
+  - Time gap indicators between steps
+  - Toggle between timeline and list view in ExecutionDetail
+- [x] Effort: 20h
 
 ---
 

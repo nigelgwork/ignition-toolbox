@@ -25,6 +25,7 @@ import {
   Switch,
   FormControlLabel,
   Tooltip,
+  IconButton,
 } from '@mui/material';
 import {
   CheckCircle as CompletedIcon,
@@ -36,6 +37,8 @@ import {
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
   Terminal as LogsIcon,
+  ViewList as ListViewIcon,
+  Timeline as TimelineViewIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -44,6 +47,7 @@ import { LiveBrowserView } from '../components/LiveBrowserView';
 import { ExecutionControls } from '../components/ExecutionControls';
 import { DebugPanel } from '../components/DebugPanel';
 import { PlaybookCodeViewer } from '../components/PlaybookCodeViewer';
+import { ExecutionTimeline } from '../components/ExecutionTimeline';
 import { useStore } from '../store';
 import type { ExecutionStatusResponse } from '../types/api';
 
@@ -59,6 +63,7 @@ export function ExecutionDetail() {
   const [showCodeViewer, setShowCodeViewer] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [runtime, setRuntime] = useState<string>('0s');
+  const [stepViewMode, setStepViewMode] = useState<'list' | 'timeline'>('timeline');
 
   // Fetch execution from API
   const { data: executionFromAPI, isLoading, error } = useQuery<ExecutionStatusResponse>({
@@ -559,14 +564,30 @@ export function ExecutionDetail() {
               zIndex: 1,
             }}
           >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
               <Typography variant="h6">Step Progress</Typography>
-              <Chip
-                label={`Runtime: ${runtime}`}
-                size="small"
-                color={execution.status === 'running' ? 'primary' : 'default'}
-                sx={{ fontWeight: 'bold', fontFamily: 'monospace' }}
-              />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {/* View mode toggle */}
+                <Tooltip title={stepViewMode === 'list' ? 'Switch to timeline view' : 'Switch to list view'}>
+                  <IconButton
+                    size="small"
+                    onClick={() => setStepViewMode(stepViewMode === 'list' ? 'timeline' : 'list')}
+                    sx={{ p: 0.5 }}
+                  >
+                    {stepViewMode === 'list' ? (
+                      <TimelineViewIcon fontSize="small" />
+                    ) : (
+                      <ListViewIcon fontSize="small" />
+                    )}
+                  </IconButton>
+                </Tooltip>
+                <Chip
+                  label={`Runtime: ${runtime}`}
+                  size="small"
+                  color={execution.status === 'running' ? 'primary' : 'default'}
+                  sx={{ fontWeight: 'bold', fontFamily: 'monospace' }}
+                />
+              </Box>
             </Box>
             <Typography variant="caption" color="text.secondary">
               {execution.current_step_index !== undefined
@@ -575,82 +596,93 @@ export function ExecutionDetail() {
             </Typography>
           </Box>
 
-          <List sx={{ py: 0 }}>
-            {deduplicatedStepResults.length > 0 ? (
-              deduplicatedStepResults.map((step, index) => (
-                <Box key={step.step_id || index}>
-                  <ListItem
-                    sx={{
-                      py: 0.5,
-                      px: 1,
-                      minHeight: '36px',
-                      bgcolor:
-                        index === execution.current_step_index
-                          ? 'action.selected'
-                          : 'transparent',
-                    }}
-                  >
-                    <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', fontSize: '1rem' }}>{getStatusIcon(step.status)}</Box>
-                    <ListItemText
-                      primary={step.step_name || `Step ${index + 1}`}
-                      secondary={
-                        <>
-                          {step.error ? (
-                            <Typography variant="caption" color="error" sx={{ fontSize: '0.65rem' }}>
-                              Error: {step.error}
-                            </Typography>
-                          ) : step.completed_at ? (
-                            `Completed at ${new Date(
-                              step.completed_at
-                            ).toLocaleTimeString()}`
-                          ) : (
-                            step.status
-                          )}
-                          {/* Display python script output if available */}
-                          {step.output && step.output._output && (
-                            <Typography
-                              variant="caption"
-                              component="pre"
-                              sx={{
-                                fontSize: '0.7rem',
-                                fontFamily: 'monospace',
-                                whiteSpace: 'pre-wrap',
-                                wordBreak: 'break-word',
-                                mt: 1,
-                                p: 1,
-                                bgcolor: 'rgba(0, 255, 0, 0.05)',
-                                borderRadius: 1,
-                                border: '1px solid rgba(0, 255, 0, 0.2)',
-                                color: '#00ff00',
-                                maxHeight: '400px',
-                                overflow: 'auto',
-                                display: 'block',
-                              }}
-                            >
-                              {step.output._output}
-                            </Typography>
-                          )}
-                        </>
-                      }
-                      primaryTypographyProps={{ variant: 'body2', fontSize: '0.8rem' }}
-                      secondaryTypographyProps={{ variant: 'caption', fontSize: '0.7rem' }}
-                    />
-                    <Chip
-                      label={step.status}
-                      size="small"
-                      color={getStatusColor(step.status) as any}
-                      sx={{ height: '20px', fontSize: '0.65rem', '& .MuiChip-label': { px: 1, py: 0 } }}
-                    />
-                  </ListItem>
-                  {index < deduplicatedStepResults.length - 1 && <Divider />}
-                </Box>
-              ))
-            ) : (
-              <ListItem sx={{ py: 1 }}>
-                <ListItemText primary="No steps executed yet" primaryTypographyProps={{ variant: 'body2', fontSize: '0.8rem' }} />
-              </ListItem>
-            )}
-          </List>
+          {/* Timeline View */}
+          {stepViewMode === 'timeline' ? (
+            <Box sx={{ p: 1 }}>
+              <ExecutionTimeline
+                steps={deduplicatedStepResults}
+                currentStepIndex={execution.current_step_index}
+              />
+            </Box>
+          ) : (
+            /* List View */
+            <List sx={{ py: 0 }}>
+              {deduplicatedStepResults.length > 0 ? (
+                deduplicatedStepResults.map((step, index) => (
+                  <Box key={step.step_id || index}>
+                    <ListItem
+                      sx={{
+                        py: 0.5,
+                        px: 1,
+                        minHeight: '36px',
+                        bgcolor:
+                          index === execution.current_step_index
+                            ? 'action.selected'
+                            : 'transparent',
+                      }}
+                    >
+                      <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', fontSize: '1rem' }}>{getStatusIcon(step.status)}</Box>
+                      <ListItemText
+                        primary={step.step_name || `Step ${index + 1}`}
+                        secondary={
+                          <>
+                            {step.error ? (
+                              <Typography variant="caption" color="error" sx={{ fontSize: '0.65rem' }}>
+                                Error: {step.error}
+                              </Typography>
+                            ) : step.completed_at ? (
+                              `Completed at ${new Date(
+                                step.completed_at
+                              ).toLocaleTimeString()}`
+                            ) : (
+                              step.status
+                            )}
+                            {/* Display python script output if available */}
+                            {step.output && step.output._output && (
+                              <Typography
+                                variant="caption"
+                                component="pre"
+                                sx={{
+                                  fontSize: '0.7rem',
+                                  fontFamily: 'monospace',
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word',
+                                  mt: 1,
+                                  p: 1,
+                                  bgcolor: 'rgba(0, 255, 0, 0.05)',
+                                  borderRadius: 1,
+                                  border: '1px solid rgba(0, 255, 0, 0.2)',
+                                  color: '#00ff00',
+                                  maxHeight: '400px',
+                                  overflow: 'auto',
+                                  display: 'block',
+                                }}
+                              >
+                                {step.output._output}
+                              </Typography>
+                            )}
+                          </>
+                        }
+                        primaryTypographyProps={{ variant: 'body2', fontSize: '0.8rem' }}
+                        secondaryTypographyProps={{ variant: 'caption', fontSize: '0.7rem' }}
+                      />
+                      <Chip
+                        label={step.status}
+                        size="small"
+                        color={getStatusColor(step.status) as any}
+                        sx={{ height: '20px', fontSize: '0.65rem', '& .MuiChip-label': { px: 1, py: 0 } }}
+                      />
+                    </ListItem>
+                    {index < deduplicatedStepResults.length - 1 && <Divider />}
+                  </Box>
+                ))
+              ) : (
+                <ListItem sx={{ py: 1 }}>
+                  <ListItemText primary="No steps executed yet" primaryTypographyProps={{ variant: 'body2', fontSize: '0.8rem' }} />
+                </ListItem>
+              )}
+            </List>
+          )}
         </Paper>
 
         {/* Middle: Live Browser View OR Debug Panel OR Placeholder */}

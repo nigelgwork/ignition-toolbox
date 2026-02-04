@@ -17,6 +17,7 @@ import {
   Switch,
 } from '@mui/material';
 import FolderIcon from '@mui/icons-material/Folder';
+import { HelpTooltip } from './HelpTooltip';
 import type { ParameterInfo, CredentialInfo } from '../types/api';
 import FolderBrowserDialog from './FolderBrowserDialog';
 import { createLogger } from '../utils/logger';
@@ -82,12 +83,33 @@ export function ParameterInput({
   );
   const displayLabel = isModuleSigningParam ? 'Module Signing' : parameter.name;
 
+  // Get contextual help text based on parameter type
+  const getParameterHelp = (): string | null => {
+    if (parameter.type === 'credential') {
+      return 'Select a saved credential from your vault. Credentials contain username, password, and optionally a gateway URL.';
+    }
+    if (isPathParameter) {
+      return 'Enter a file system path or click the folder icon to browse. Paths should be absolute (e.g., C:\\modules or /opt/modules).';
+    }
+    if (parameter.type === 'boolean') {
+      return isModuleSigningParam
+        ? 'Signed modules are verified by Inductive Automation. Unsigned modules are custom or third-party modules without official signing.'
+        : null;
+    }
+    return null;
+  };
+
+  const helpText = getParameterHelp();
+
   return (
     <FormControl fullWidth>
-      <FormLabel htmlFor={`param-${parameter.name}`} sx={{ mb: 0.5, fontSize: '0.875rem' }}>
-        {displayLabel}
-        {parameter.required && ' *'}
-      </FormLabel>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+        <FormLabel htmlFor={`param-${parameter.name}`} sx={{ fontSize: '0.875rem' }}>
+          {displayLabel}
+          {parameter.required && ' *'}
+        </FormLabel>
+        {helpText && <HelpTooltip size="small" content={helpText} />}
+      </Box>
 
       {parameter.type === 'credential' ? (
         <Select

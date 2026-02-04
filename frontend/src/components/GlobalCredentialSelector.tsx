@@ -19,6 +19,7 @@ import {
   CheckCircle as ConnectedIcon,
   Error as DisconnectedIcon,
 } from '@mui/icons-material';
+import { HelpTooltip } from './HelpTooltip';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useStore, type SessionCredential } from '../store';
@@ -109,9 +110,15 @@ export function GlobalCredentialSelector() {
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 300 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
-        Global Credentials:
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
+          Global Credentials:
+        </Typography>
+        <HelpTooltip
+          size="small"
+          content="Select a credential to auto-fill into all playbook executions. The selected credential's username, password, and gateway URL will be pre-populated in playbook parameters. You can still override these values per playbook."
+        />
+      </Box>
       <FormControl size="small" sx={{ flex: 1, minWidth: 200 }}>
         <Select
           labelId="global-credential-label"

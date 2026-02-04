@@ -19,6 +19,7 @@ import {
   Typography,
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { HelpTooltip } from './HelpTooltip';
 import type { CredentialCreate } from '../types/api';
 import { useStore, type SessionCredential } from '../store';
 
@@ -99,17 +100,20 @@ export function AddCredentialDialog({
       <form onSubmit={handleSubmit}>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="gateway_admin"
-              required
-              fullWidth
-              autoFocus
-              helperText="Unique identifier for this credential"
-              disabled={isLoading}
-            />
+            <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+              <TextField
+                label="Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="gateway_admin"
+                required
+                fullWidth
+                autoFocus
+                helperText="Unique identifier for this credential"
+                disabled={isLoading}
+              />
+              <HelpTooltip content="A unique name to reference this credential in playbooks. Use lowercase with underscores (e.g., 'prod_gateway', 'dev_admin'). This name appears in playbook parameter dropdowns." />
+            </Box>
 
             <TextField
               label="Username"
@@ -144,15 +148,18 @@ export function AddCredentialDialog({
               }}
             />
 
-            <TextField
-              label="Gateway URL (Optional)"
-              value={gatewayUrl}
-              onChange={(e) => setGatewayUrl(e.target.value)}
-              placeholder="http://localhost:8088"
-              fullWidth
-              disabled={isLoading}
-              helperText="Gateway URL for automatic configuration"
-            />
+            <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+              <TextField
+                label="Gateway URL (Optional)"
+                value={gatewayUrl}
+                onChange={(e) => setGatewayUrl(e.target.value)}
+                placeholder="http://localhost:8088"
+                fullWidth
+                disabled={isLoading}
+                helperText="Gateway URL for automatic configuration"
+              />
+              <HelpTooltip content="The full URL of your Ignition Gateway (e.g., http://192.168.1.100:8088). When set, this credential auto-fills the gateway URL in playbooks. Leave empty if using different gateways." />
+            </Box>
 
             <TextField
               label="Description (Optional)"
@@ -165,7 +172,7 @@ export function AddCredentialDialog({
               disabled={isLoading}
             />
 
-            <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+            <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 1, display: 'flex', alignItems: 'flex-start' }}>
               <FormControlLabel
                 control={
                   <Switch
@@ -182,7 +189,9 @@ export function AddCredentialDialog({
                     </Typography>
                   </Box>
                 }
+                sx={{ flex: 1 }}
               />
+              <HelpTooltip content="Session-only credentials are stored in memory only. Use this for testing or when you don't want credentials saved to disk. They will be lost when you close the application." />
             </Box>
 
             {error && !sessionOnly && (

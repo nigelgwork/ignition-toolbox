@@ -16,6 +16,7 @@ import {
   InputAdornment,
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { HelpTooltip } from './HelpTooltip';
 import type { CredentialInfo, CredentialCreate } from '../types/api';
 
 interface EditCredentialDialogProps {
@@ -103,29 +104,32 @@ export function EditCredentialDialog({
               disabled={isLoading}
             />
 
-            <TextField
-              label="Password"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              fullWidth
-              disabled={isLoading}
-              helperText="Enter new password (required to update)"
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      onClick={() => setShowPassword(!showPassword)}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
+            <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+              <TextField
+                label="Password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                fullWidth
+                disabled={isLoading}
+                helperText="Enter new password (required to update)"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <HelpTooltip content="For security, the current password is not displayed. You must enter the new password to save changes. Passwords are encrypted at rest." />
+            </Box>
 
             <TextField
               label="Gateway URL (Optional)"
