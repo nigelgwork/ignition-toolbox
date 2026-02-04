@@ -318,35 +318,119 @@ class CloudDesignerManager:
                 env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,  # Combine stderr into stdout
-                text=True,
-                encoding='utf-8',
-                errors='replace',
+                bufsize=1,  # Line buffered - critical for proper output streaming
                 creationflags=CREATION_FLAGS,
             )
 
-            # Stream build output to logs
-            build_output_lines = []
-            try:
-                for line in iter(build_process.stdout.readline, ''):
-                    if not line:
-                        break
-                    line = line.strip()
-                    if line:
-                        build_output_lines.append(line)
-                        # Log significant build steps
-                        if any(keyword in line.lower() for keyword in ['step', 'run ', 'copy ', 'downloading', 'extracting', 'installing', 'error', 'warning']):
-                            # Truncate long lines
-                            log_line = line[:150] + '...' if len(line) > 150 else line
-                            logger.info(f"[CloudDesigner Build] {log_line}")
+            # Stream build output to logs using thread-based reading to avoid blocking
+            # This fixes silent failures in production where readline() can block indefinitely
+            import queue
+            import threading
 
-                build_process.wait(timeout=600)  # 10 minute timeout
+            build_output_lines: list[str] = []
+            output_queue: queue.Queue[str | None] = queue.Queue()
+
+            def read_output(pipe, q):
+                """Read output from pipe in a separate thread to avoid blocking."""
+                try:
+                    while True:
+                        # Read raw bytes and decode - more reliable than text mode
+                        chunk = pipe.read(1024)
+                        if not chunk:
+                            break
+                        try:
+                            text = chunk.decode('utf-8', errors='replace')
+                            q.put(text)
+                        except Exception:
+                            pass
+                except Exception as e:
+                    logger.warning(f"[CloudDesigner] Output reader error: {e}")
+                finally:
+                    q.put(None)  # Signal end of output
+
+            reader_thread = threading.Thread(
+                target=read_output,
+                args=(build_process.stdout, output_queue),
+                daemon=True
+            )
+            reader_thread.start()
+
+            # Process output with timeout handling
+            build_timeout = 600  # 10 minutes
+            start_time = time.time()
+            last_progress_log = start_time
+            partial_line = ""
+            lines_received = 0
+
+            try:
+                while True:
+                    elapsed = time.time() - start_time
+                    if elapsed > build_timeout:
+                        build_process.kill()
+                        logger.error("[CloudDesigner] Build timed out after 10 minutes")
+                        return {
+                            "success": False,
+                            "error": "Docker build timed out after 10 minutes. Try running 'docker system prune' to free up space.",
+                            "output": "\n".join(build_output_lines[-50:]),
+                        }
+
+                    # Check if process has finished
+                    ret = build_process.poll()
+                    if ret is not None:
+                        # Process finished, drain remaining output
+                        logger.info(f"[CloudDesigner] Build process finished with code {ret}, draining output...")
+                        while True:
+                            try:
+                                chunk = output_queue.get_nowait()
+                                if chunk is None:
+                                    break
+                                partial_line += chunk
+                            except queue.Empty:
+                                break
+                        # Process any remaining partial line
+                        if partial_line.strip():
+                            build_output_lines.append(partial_line.strip())
+                        break
+
+                    # Get output with timeout (don't block forever)
+                    try:
+                        chunk = output_queue.get(timeout=5.0)
+                        if chunk is None:
+                            break  # End of output
+                        partial_line += chunk
+
+                        # Process complete lines
+                        while '\n' in partial_line:
+                            line, partial_line = partial_line.split('\n', 1)
+                            line = line.strip()
+                            if line:
+                                build_output_lines.append(line)
+                                lines_received += 1
+                                # Log significant build steps
+                                if any(keyword in line.lower() for keyword in ['step', 'run ', 'copy ', 'downloading', 'extracting', 'installing', 'error', 'warning', '#']):
+                                    log_line = line[:150] + '...' if len(line) > 150 else line
+                                    logger.info(f"[CloudDesigner Build] {log_line}")
+                    except queue.Empty:
+                        # No output for 5 seconds, but process still running
+                        # Log progress every 30 seconds so user knows build is ongoing
+                        now = time.time()
+                        if now - last_progress_log >= 30:
+                            minutes = int(elapsed // 60)
+                            seconds = int(elapsed % 60)
+                            logger.info(f"[CloudDesigner] Build in progress... ({minutes}m {seconds}s elapsed, {lines_received} lines received)")
+                            last_progress_log = now
+                        continue
+
+                # Wait for process to fully complete
+                build_process.wait(timeout=30)
+                logger.info(f"[CloudDesigner] Build complete. Total lines: {lines_received}")
             except subprocess.TimeoutExpired:
                 build_process.kill()
-                logger.error("[CloudDesigner] Build timed out after 10 minutes")
+                logger.error("[CloudDesigner] Build process did not terminate cleanly")
                 return {
                     "success": False,
-                    "error": "Docker build timed out after 10 minutes. Try running 'docker system prune' to free up space.",
-                    "output": "\n".join(build_output_lines[-50:]),  # Last 50 lines
+                    "error": "Docker build did not terminate cleanly.",
+                    "output": "\n".join(build_output_lines[-50:]),
                 }
 
             if build_process.returncode != 0:

@@ -322,6 +322,26 @@ class BrowserManager:
         screenshot_bytes = await page.screenshot(type="png")
         return base64.b64encode(screenshot_bytes).decode("utf-8")
 
+    async def get_element_screenshot_base64(self, selector: str) -> str:
+        """
+        Get screenshot of a specific element as base64-encoded string
+
+        Args:
+            selector: CSS selector for the element to screenshot
+
+        Returns:
+            Base64-encoded PNG screenshot of the element
+
+        Raises:
+            ValueError: If element not found
+        """
+        page = await self.get_page()
+        element = await page.query_selector(selector)
+        if element is None:
+            raise ValueError(f"Element not found for screenshot: {selector}")
+        screenshot_bytes = await element.screenshot(type="png")
+        return base64.b64encode(screenshot_bytes).decode("utf-8")
+
     async def evaluate(self, script: str) -> Any:
         """
         Execute JavaScript

@@ -52,6 +52,7 @@ class StepType(str, Enum):
     BROWSER_VERIFY_TEXT = "browser.verify_text"
     BROWSER_VERIFY_ATTRIBUTE = "browser.verify_attribute"
     BROWSER_VERIFY_STATE = "browser.verify_state"
+    BROWSER_COMPARE_SCREENSHOT = "browser.compare_screenshot"
 
     # Designer operations (desktop application automation)
     DESIGNER_LAUNCH = "designer.launch"
@@ -77,6 +78,7 @@ class StepType(str, Enum):
     PERSPECTIVE_EXECUTE_TEST_MANIFEST = "perspective.execute_test_manifest"
     PERSPECTIVE_VERIFY_NAVIGATION = "perspective.verify_navigation"
     PERSPECTIVE_VERIFY_DOCK = "perspective.verify_dock_opened"
+    PERSPECTIVE_VERIFY_WITH_AI = "perspective.verify_with_ai"
 
     # FAT reporting operations
     FAT_GENERATE_REPORT = "fat.generate_report"

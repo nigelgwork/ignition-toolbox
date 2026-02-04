@@ -22,6 +22,7 @@ from ignition_toolkit.playbook.executors.gateway_executor import (
 )
 from ignition_toolkit.playbook.executors.browser_executor import (
     BrowserClickHandler,
+    BrowserCompareScreenshotHandler,
     BrowserFillHandler,
     BrowserFileUploadHandler,
     BrowserNavigateHandler,
@@ -59,6 +60,10 @@ from ignition_toolkit.playbook.executors.fat_executor import (
     FATGenerateReportHandler,
     FATExportReportHandler,
 )
+from ignition_toolkit.playbook.executors.ai_executor import (
+    PerspectiveVerifyWithAIHandler,
+    AIAnalyzeHandler,
+)
 
 __all__ = [
     "StepHandler",
@@ -86,6 +91,7 @@ __all__ = [
     "BrowserVerifyTextHandler",
     "BrowserVerifyAttributeHandler",
     "BrowserVerifyStateHandler",
+    "BrowserCompareScreenshotHandler",
     # Designer
     "DesignerLaunchHandler",
     "DesignerLaunchShortcutHandler",
@@ -110,4 +116,7 @@ __all__ = [
     # FAT Reporting
     "FATGenerateReportHandler",
     "FATExportReportHandler",
+    # AI Verification
+    "PerspectiveVerifyWithAIHandler",
+    "AIAnalyzeHandler",
 ]

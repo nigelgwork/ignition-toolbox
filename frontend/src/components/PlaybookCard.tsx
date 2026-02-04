@@ -49,6 +49,7 @@ import {
   ContentCopy as DuplicateIcon,
   CheckCircle as ConfiguredIcon,
   RadioButtonUnchecked as NotConfiguredIcon,
+  Code as CodeIcon,
 } from '@mui/icons-material';
 import type { PlaybookInfo } from '../types/api';
 import { useStore } from '../store';
@@ -62,6 +63,7 @@ interface PlaybookCardProps {
   onExecute?: (playbook: PlaybookInfo) => void;
   onExport?: (playbook: PlaybookInfo) => void;
   onViewSteps?: (playbook: PlaybookInfo) => void;
+  onEditPlaybook?: (playbook: PlaybookInfo) => void;
 }
 
 // Get saved config for preview
@@ -77,7 +79,7 @@ function getSavedConfigPreview(playbookPath: string): SavedConfig | null {
 
 // Verification status is now based on playbook.verified property
 
-export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onViewSteps }: PlaybookCardProps) {
+export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onViewSteps, onEditPlaybook }: PlaybookCardProps) {
   const queryClient = useQueryClient();
   const [savedConfig, setSavedConfig] = useState<SavedConfig | null>(getSavedConfigPreview(playbook.path));
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
@@ -563,11 +565,24 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
 
         <Divider />
 
-        {/* Edit Playbook */}
+        {/* Edit Playbook Metadata */}
         <MenuItem onClick={handleOpenEditDialog}>
           <EditIcon fontSize="small" sx={{ mr: 1 }} />
-          Edit Playbook
+          Edit Name/Description
         </MenuItem>
+
+        {/* Edit Steps & YAML (Form-based editor) */}
+        {onEditPlaybook && (
+          <MenuItem
+            onClick={() => {
+              setMenuAnchor(null);
+              onEditPlaybook(playbook);
+            }}
+          >
+            <CodeIcon fontSize="small" sx={{ mr: 1 }} />
+            Edit Steps & YAML
+          </MenuItem>
+        )}
 
         {/* Duplicate Playbook */}
         <MenuItem

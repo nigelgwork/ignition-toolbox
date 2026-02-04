@@ -8,7 +8,7 @@ This file provides guidance to Claude Code when working with the Ignition Toolbo
 
 **Ignition Toolbox** is a distributable desktop application for visual acceptance testing of Ignition SCADA systems. It packages the Ignition Automation Toolkit as a standalone Electron app with an embedded Python backend.
 
-**Current Version:** 1.4.72
+**Current Version:** 1.4.73
 **Architecture:** Electron + Python subprocess
 **Target Platform:** Windows (primary), cross-platform possible
 **Key Technologies:** Electron, TypeScript, React 19, FastAPI, Playwright, SQLite
@@ -117,12 +117,27 @@ python run_backend.py
 ```
 
 ### Building for Distribution
-```bash
-# Build Windows installer
-npm run dist:win
 
-# Output: release/Ignition-Toolbox-Setup-1.0.0.exe
+**IMPORTANT: Production builds are done via GitHub Actions, NOT locally.**
+
+```bash
+# To release a new version:
+# 1. Update version in package.json and frontend/package.json
+# 2. Commit changes
+# 3. Create and push a version tag:
+git tag v1.4.73
+git push origin v1.4.73
+
+# This triggers GitHub Actions workflow (build-windows.yml) which:
+# - Builds on windows-latest runner
+# - Creates the Windows installer with PyInstaller
+# - Publishes to GitHub Releases
+# - Users receive auto-update notification
+
+# You can also manually trigger from GitHub Actions UI using workflow_dispatch
 ```
+
+**DO NOT use `npm run dist:win` for production releases** - this only works on a local Windows machine and is not the standard release process.
 
 ## Key Components
 
@@ -186,14 +201,36 @@ git tag v1.0.1
 git push origin v1.0.1  # Triggers GitHub Actions build
 ```
 
-## CI/CD
+## CI/CD - GitHub Actions (CRITICAL)
+
+**All production builds happen via GitHub Actions on `windows-latest` runners.**
 
 GitHub Actions workflows in `.github/workflows/`:
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | Push to main, PRs | Build verification |
-| `build-windows.yml` | Tag push (`v*`) | Build Windows installer, publish release |
+| `ci.yml` | Push to main, PRs | Build verification (Windows + Ubuntu) |
+| `build-windows.yml` | Tag push (`v*`) or manual | **Production Windows installer build** |
+
+### Release Process
+1. Make code changes and test locally (Python backend, frontend)
+2. Update version in `package.json` and `frontend/package.json`
+3. Commit all changes to main branch
+4. Create version tag: `git tag v1.4.73`
+5. Push tag: `git push origin v1.4.73`
+6. GitHub Actions automatically:
+   - Builds on Windows runner
+   - Packages with PyInstaller + electron-builder
+   - Creates GitHub Release with installer
+   - Users get auto-update notification
+
+### Manual Build Trigger
+You can also trigger builds from GitHub Actions UI:
+1. Go to Actions → Build Windows
+2. Click "Run workflow"
+3. Optionally specify version
+
+**NEVER attempt to build production installer locally** - PyInstaller creates platform-specific binaries.
 
 ## Security
 

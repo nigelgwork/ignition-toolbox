@@ -160,6 +160,22 @@ export const api = {
    */
   playbooks: {
     list: () => fetchJSON<PlaybookInfo[]>('/api/playbooks'),
+    getStepTypes: () => fetchJSON<{
+      step_types: Array<{
+        type: string;
+        domain: string;
+        description: string;
+        parameters: Array<{
+          name: string;
+          type: string;
+          required: boolean;
+          default: string | number | boolean | null;
+          description: string;
+          options?: string[];
+        }>;
+      }>;
+      domains: string[];
+    }>('/api/playbooks/step-types'),
     get: (path: string) =>
       fetchJSON<PlaybookInfo>(`/api/playbooks/${encodeURIComponent(path)}`),
     update: (playbookPath: string, yamlContent: string) =>
@@ -770,6 +786,91 @@ export const api = {
    * Get the base URL for API calls
    */
   getBaseUrl: () => API_BASE_URL,
+
+  /**
+   * Visual Testing Baselines
+   */
+  baselines: {
+    list: (params?: { status?: string; playbook_path?: string }) => {
+      const query = new URLSearchParams();
+      if (params?.status) query.set('status', params.status);
+      if (params?.playbook_path) query.set('playbook_path', params.playbook_path);
+      const queryString = query.toString();
+      return fetchJSON<any[]>(`/api/baselines${queryString ? `?${queryString}` : ''}`);
+    },
+
+    get: (baselineId: number) =>
+      fetchJSON<any>(`/api/baselines/${baselineId}`),
+
+    create: (data: {
+      name: string;
+      screenshot_path: string;
+      playbook_path?: string;
+      step_id?: string;
+      description?: string;
+      auto_approve?: boolean;
+    }) =>
+      fetchJSON<any>('/api/baselines', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    approve: (baselineId: number, approvedBy?: string) =>
+      fetchJSON<any>(`/api/baselines/${baselineId}/approve${approvedBy ? `?approved_by=${encodeURIComponent(approvedBy)}` : ''}`, {
+        method: 'POST',
+      }),
+
+    reject: (baselineId: number) =>
+      fetchJSON<any>(`/api/baselines/${baselineId}/reject`, {
+        method: 'POST',
+      }),
+
+    update: (baselineId: number, screenshotPath: string) =>
+      fetchJSON<any>(`/api/baselines/${baselineId}?screenshot_path=${encodeURIComponent(screenshotPath)}`, {
+        method: 'PUT',
+      }),
+
+    setIgnoreRegions: (baselineId: number, regions: Array<{ x: number; y: number; width: number; height: number }>) =>
+      fetchJSON<any>(`/api/baselines/${baselineId}/ignore-regions`, {
+        method: 'PUT',
+        body: JSON.stringify({ regions }),
+      }),
+
+    delete: (baselineId: number) =>
+      fetchJSON<{ status: string; baseline_id: number }>(`/api/baselines/${baselineId}`, {
+        method: 'DELETE',
+      }),
+
+    compare: (data: {
+      baseline_name: string;
+      screenshot_path: string;
+      threshold?: number;
+      execution_id?: number;
+    }) =>
+      fetchJSON<{
+        comparison_id: number;
+        baseline_name: string;
+        baseline_id: number;
+        passed: boolean;
+        similarity_score: number;
+        threshold: number;
+        diff_pixel_count: number;
+        total_pixels: number;
+        diff_image_path: string | null;
+      }>('/api/baselines/compare', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    getComparisonHistory: (params?: { baseline_id?: number; execution_id?: number; limit?: number }) => {
+      const query = new URLSearchParams();
+      if (params?.baseline_id) query.set('baseline_id', params.baseline_id.toString());
+      if (params?.execution_id) query.set('execution_id', params.execution_id.toString());
+      if (params?.limit) query.set('limit', params.limit.toString());
+      const queryString = query.toString();
+      return fetchJSON<any[]>(`/api/baselines/comparisons/history${queryString ? `?${queryString}` : ''}`);
+    },
+  },
 
   /**
    * Toolbox Assistant Actions - AI assistant operations

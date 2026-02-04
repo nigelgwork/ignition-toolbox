@@ -63,17 +63,19 @@ import { PlaybookExecutionDialog } from '../components/PlaybookExecutionDialog';
 import { PlaybookStepsDialog } from '../components/PlaybookStepsDialog';
 import { PlaybookLibraryDialog } from '../components/PlaybookLibraryDialog';
 import { PlaybookUpdatesDialog } from '../components/PlaybookUpdatesDialog';
+import { PlaybookEditorDialog } from '../components/PlaybookEditorDialog';
 import { useStore } from '../store';
 import { useDensity } from '../hooks/useDensity';
 import type { PlaybookInfo } from '../types/api';
 
 // Sortable playbook card wrapper
-function SortablePlaybookCard({ playbook, onConfigure, onExecute, onExport, onViewSteps, dragEnabled }: {
+function SortablePlaybookCard({ playbook, onConfigure, onExecute, onExport, onViewSteps, onEditPlaybook, dragEnabled }: {
   playbook: PlaybookInfo;
   onConfigure: (playbook: PlaybookInfo) => void;
   onExecute?: (playbook: PlaybookInfo) => void;
   onExport?: (playbook: PlaybookInfo) => void;
   onViewSteps?: (playbook: PlaybookInfo) => void;
+  onEditPlaybook?: (playbook: PlaybookInfo) => void;
   dragEnabled: boolean;
 }) {
   const {
@@ -100,6 +102,7 @@ function SortablePlaybookCard({ playbook, onConfigure, onExecute, onExport, onVi
         onExecute={onExecute}
         onExport={onExport}
         onViewSteps={onViewSteps}
+        onEditPlaybook={onEditPlaybook}
       />
     </div>
   );
@@ -327,6 +330,7 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
   const [selectedPlaybook, setSelectedPlaybook] = useState<PlaybookInfo | null>(null);
   const [dragEnabled, setDragEnabled] = useState(false);
   const [stepsDialogPlaybook, setStepsDialogPlaybook] = useState<PlaybookInfo | null>(null);
+  const [editorPlaybook, setEditorPlaybook] = useState<PlaybookInfo | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(getGroupExpandedState());
   const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
@@ -572,6 +576,10 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
 
   const handleViewSteps = (playbook: PlaybookInfo) => {
     setStepsDialogPlaybook(playbook);
+  };
+
+  const handleEditPlaybook = (playbook: PlaybookInfo) => {
+    setEditorPlaybook(playbook);
   };
 
   const handleExport = async (playbook: PlaybookInfo) => {
@@ -939,6 +947,7 @@ metadata:
                           onExecute={handleExecute}
                           onExport={handleExport}
                           onViewSteps={handleViewSteps}
+                          onEditPlaybook={handleEditPlaybook}
                           dragEnabled={dragEnabled}
                         />
                       ))}
@@ -982,6 +991,7 @@ metadata:
                               onExecute={handleExecute}
                               onExport={handleExport}
                               onViewSteps={handleViewSteps}
+                              onEditPlaybook={handleEditPlaybook}
                               dragEnabled={dragEnabled}
                             />
                           ))}
@@ -1064,6 +1074,7 @@ metadata:
                                           onExecute={handleExecute}
                                           onExport={handleExport}
                                           onViewSteps={handleViewSteps}
+                                          onEditPlaybook={handleEditPlaybook}
                                           dragEnabled={dragEnabled}
                                         />
                                       ))}
@@ -1110,6 +1121,7 @@ metadata:
                                               onExecute={handleExecute}
                                               onExport={handleExport}
                                               onViewSteps={handleViewSteps}
+                                              onEditPlaybook={handleEditPlaybook}
                                               dragEnabled={dragEnabled}
                                             />
                                           ))}
@@ -1142,6 +1154,7 @@ metadata:
                                     onExecute={handleExecute}
                                     onExport={handleExport}
                                     onViewSteps={handleViewSteps}
+                                    onEditPlaybook={handleEditPlaybook}
                                     dragEnabled={dragEnabled}
                                   />
                                 ))}
@@ -1248,6 +1261,16 @@ metadata:
       <PlaybookUpdatesDialog
         open={updatesDialogOpen}
         onClose={() => setUpdatesDialogOpen(false)}
+      />
+
+      {/* Playbook Editor Dialog (Form-based) */}
+      <PlaybookEditorDialog
+        open={editorPlaybook !== null}
+        playbook={editorPlaybook}
+        onClose={() => setEditorPlaybook(null)}
+        onSaved={() => {
+          // Optionally refresh the playbooks list
+        }}
       />
 
     </Box>

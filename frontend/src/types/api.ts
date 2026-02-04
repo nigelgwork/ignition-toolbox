@@ -272,3 +272,25 @@ export interface LogStats {
   oldest_entry: string | null;
   newest_entry: string | null;
 }
+
+// Step Type metadata for form-based playbook editor
+export interface StepTypeParameter {
+  name: string;
+  type: string;  // string, integer, float, boolean, credential, file, list, dict, selector
+  required: boolean;
+  default: string | number | boolean | null;
+  description: string;
+  options?: string[];  // For enum-like parameters
+}
+
+export interface StepTypeInfo {
+  type: string;
+  domain: string;
+  description: string;
+  parameters: StepTypeParameter[];
+}
+
+export interface StepTypesResponse {
+  step_types: StepTypeInfo[];
+  domains: string[];
+}

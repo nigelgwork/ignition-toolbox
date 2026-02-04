@@ -36,6 +36,8 @@ from ignition_toolkit.api.routers.clawdbot import router as clawdbot_router
 from ignition_toolkit.api.routers.updates import router as updates_router
 from ignition_toolkit.api.routers.websockets import router as websockets_router
 from ignition_toolkit.api.routers.logs import router as logs_router
+from ignition_toolkit.api.routers.step_types import router as step_types_router
+from ignition_toolkit.api.routers.baselines import router as baselines_router
 from ignition_toolkit.api.services.log_capture import setup_log_capture
 from ignition_toolkit.playbook.engine import PlaybookEngine
 from ignition_toolkit.playbook.metadata import PlaybookMetadataStore
@@ -95,6 +97,12 @@ app.include_router(websockets_router)
 
 # Register Logs router (for UI log access)
 app.include_router(logs_router)
+
+# Register Step Types router (for form-based playbook editor)
+app.include_router(step_types_router)
+
+# Register Baselines router (for visual testing)
+app.include_router(baselines_router)
 
 # Initialize log capture for UI access
 setup_log_capture(max_entries=2000)

@@ -21,6 +21,7 @@ from ignition_toolkit.playbook.parameters import ParameterResolver
 # Import step handlers
 from ignition_toolkit.playbook.executors import (
     BrowserClickHandler,
+    BrowserCompareScreenshotHandler,
     BrowserFillHandler,
     BrowserFileUploadHandler,
     BrowserNavigateHandler,
@@ -64,6 +65,8 @@ from ignition_toolkit.playbook.executors import (
     # FAT reporting handlers
     FATGenerateReportHandler,
     FATExportReportHandler,
+    # AI verification handlers
+    PerspectiveVerifyWithAIHandler,
 )
 
 logger = logging.getLogger(__name__)
@@ -163,6 +166,7 @@ class StepExecutor:
             handlers[StepType.BROWSER_VERIFY_TEXT] = BrowserVerifyTextHandler(self.browser_manager)
             handlers[StepType.BROWSER_VERIFY_ATTRIBUTE] = BrowserVerifyAttributeHandler(self.browser_manager)
             handlers[StepType.BROWSER_VERIFY_STATE] = BrowserVerifyStateHandler(self.browser_manager)
+            handlers[StepType.BROWSER_COMPARE_SCREENSHOT] = BrowserCompareScreenshotHandler(self.browser_manager)
 
         # Designer handlers
         if self.designer_manager:
@@ -190,6 +194,7 @@ class StepExecutor:
             handlers[StepType.PERSPECTIVE_EXECUTE_TEST_MANIFEST] = PerspectiveExecuteTestManifestHandler(self.browser_manager)
             handlers[StepType.PERSPECTIVE_VERIFY_NAVIGATION] = PerspectiveVerifyNavigationHandler(self.browser_manager)
             handlers[StepType.PERSPECTIVE_VERIFY_DOCK] = PerspectiveVerifyDockHandler(self.browser_manager)
+            handlers[StepType.PERSPECTIVE_VERIFY_WITH_AI] = PerspectiveVerifyWithAIHandler(self.browser_manager)
 
         # FAT reporting handlers (always available)
         handlers[StepType.FAT_GENERATE_REPORT] = FATGenerateReportHandler()
