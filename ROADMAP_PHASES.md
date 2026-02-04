@@ -142,8 +142,10 @@
 - [x] Test ErrorBoundary component (10 tests) ✅ DONE (v1.4.69)
 - [x] Test useWebSocket hook (16 tests) ✅ DONE (v1.4.69)
   - Connection lifecycle, callbacks, heartbeat, reconnect with backoff
+- [x] Test PlaybookCard component (14 tests) ✅ DONE (v1.4.69)
+  - Rendering, buttons, menus, dialogs, callbacks
 - [ ] Test useExecution hook
-- [ ] Test more components (PlaybookCard, ExecutionStepper)
+- [ ] Test more components (ExecutionStepper)
 - [ ] Effort: 15h
 
 ---
