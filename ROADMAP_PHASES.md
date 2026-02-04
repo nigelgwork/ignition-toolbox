@@ -244,7 +244,10 @@
 
 ### 5.1 Performance Optimizations (~25h)
 
-- [ ] WebSocket message batching (>10 events)
+- [x] WebSocket message batching (>10 events) ✅ DONE (v1.4.68)
+  - Backend queues high-frequency messages (screenshots)
+  - Batches sent when queue exceeds 10 or every 100ms
+  - Frontend unwraps batch messages transparently
 - [x] Frontend code splitting (lazy load routes) ✅ DONE (v1.4.68)
   - React.lazy() for Designer, APIExplorer, StackBuilder, ExecutionDetail
   - Reduces initial bundle load, pages load on-demand

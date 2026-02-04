@@ -2,15 +2,21 @@
 WebSocket Manager - Centralized WebSocket connection management
 
 Manages WebSocket connections and broadcasts execution updates.
+Supports message batching for high-frequency updates (screenshots).
 """
 
 import asyncio
 import logging
+from collections import deque
 from typing import Any
 
 from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
+
+# Batching configuration
+BATCH_SIZE_THRESHOLD = 10  # Batch messages when queue exceeds this
+BATCH_FLUSH_INTERVAL = 0.1  # Flush batched messages every 100ms
 
 
 class WebSocketManager:
@@ -20,21 +26,31 @@ class WebSocketManager:
     Responsibilities:
     - Track active WebSocket connections
     - Broadcast execution state updates
-    - Broadcast screenshot frames
+    - Broadcast screenshot frames (with optional batching)
     - Handle connection cleanup
+
+    Message batching is used for high-frequency messages like screenshots
+    to reduce WebSocket overhead when many frames are sent rapidly.
     """
 
-    def __init__(self, keepalive_interval: int = 15):
+    def __init__(self, keepalive_interval: int = 15, enable_batching: bool = True):
         """
         Initialize WebSocket manager
 
         Args:
             keepalive_interval: Seconds between server keepalive pings (default: 15)
+            enable_batching: Enable message batching for high-frequency updates (default: True)
         """
         self._connections: list[WebSocket] = []
         self._lock = asyncio.Lock()
         self._keepalive_tasks: dict[WebSocket, asyncio.Task] = {}
         self._keepalive_interval = keepalive_interval
+
+        # Message batching state
+        self._enable_batching = enable_batching
+        self._message_queue: deque[dict] = deque()
+        self._batch_task: asyncio.Task | None = None
+        self._batch_lock = asyncio.Lock()
 
     async def connect(self, websocket: WebSocket) -> None:
         """
@@ -173,6 +189,9 @@ class WebSocketManager:
         """
         Broadcast screenshot frame to all connected clients
 
+        Screenshots use message batching when enabled to reduce overhead
+        during rapid frame capture (e.g., 2+ FPS).
+
         Args:
             execution_id: Execution UUID
             screenshot_b64: Base64-encoded screenshot
@@ -182,12 +201,13 @@ class WebSocketManager:
         message = {
             "type": "screenshot_frame",
             "data": {
-                "executionId": execution_id,  # ✅ camelCase to match frontend
+                "executionId": execution_id,  # camelCase to match frontend
                 "screenshot": screenshot_b64,
-                "timestamp": datetime.now().isoformat(),  # ✅ Add timestamp
+                "timestamp": datetime.now().isoformat(),
             },
         }
-        await self._broadcast(message)
+        # Use batching for screenshots (high frequency)
+        await self._queue_message(message)
 
     async def broadcast_debug_context(
         self, execution_id: str, debug_context: dict[str, Any]
@@ -236,6 +256,18 @@ class WebSocketManager:
         """
         logger.info("Closing all WebSocket connections...")
 
+        # Stop batch task if running
+        if self._batch_task:
+            self._batch_task.cancel()
+            try:
+                await self._batch_task
+            except asyncio.CancelledError:
+                pass
+            self._batch_task = None
+
+        # Flush any remaining batched messages
+        await self._flush_batch()
+
         async with self._lock:
             for ws in self._connections:
                 try:
@@ -246,6 +278,65 @@ class WebSocketManager:
             self._connections.clear()
 
         logger.info("All WebSocket connections closed")
+
+    async def _queue_message(self, message: dict) -> None:
+        """
+        Queue a message for batched sending
+
+        If batching is disabled or queue is small, sends immediately.
+        Otherwise, queues the message and starts batch flush timer.
+
+        Args:
+            message: Message to queue
+        """
+        if not self._enable_batching:
+            await self._broadcast(message)
+            return
+
+        async with self._batch_lock:
+            self._message_queue.append(message)
+
+            # If queue exceeds threshold, flush immediately
+            if len(self._message_queue) >= BATCH_SIZE_THRESHOLD:
+                await self._flush_batch()
+            elif self._batch_task is None or self._batch_task.done():
+                # Start flush timer if not already running
+                self._batch_task = asyncio.create_task(self._batch_flush_timer())
+
+    async def _batch_flush_timer(self) -> None:
+        """
+        Timer task that flushes batched messages after interval
+        """
+        try:
+            await asyncio.sleep(BATCH_FLUSH_INTERVAL)
+            await self._flush_batch()
+        except asyncio.CancelledError:
+            pass
+
+    async def _flush_batch(self) -> None:
+        """
+        Flush all queued messages as a batch
+        """
+        async with self._batch_lock:
+            if not self._message_queue:
+                return
+
+            # Collect all messages
+            messages = list(self._message_queue)
+            self._message_queue.clear()
+
+        if len(messages) == 1:
+            # Single message, send as-is
+            await self._broadcast(messages[0])
+        elif len(messages) > 1:
+            # Multiple messages, send as batch
+            batch_message = {
+                "type": "batch",
+                "messages": messages,
+                "count": len(messages),
+            }
+            await self._broadcast(batch_message)
+            logger.debug(f"Sent batched message with {len(messages)} items")
 
     def get_connection_count(self) -> int:
         """

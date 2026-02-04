@@ -126,20 +126,32 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
 
-          if (message.type === 'execution_update' && message.data) {
-            callbacksRef.current.onExecutionUpdate?.(message.data as ExecutionUpdate);
-          } else if (message.type === 'screenshot_frame' && message.data) {
-            callbacksRef.current.onScreenshotFrame?.(message.data as ScreenshotFrame);
-          } else if (message.type === 'pong') {
-            // Heartbeat response - connection is alive
-            logger.debug(' Heartbeat received');
-          } else if (message.type === 'error') {
-            logger.error(' Server error:', message.error);
+          // Handle batched messages (unwrap and process each)
+          if (message.type === 'batch' && Array.isArray(message.messages)) {
+            for (const batchedMessage of message.messages) {
+              processMessage(batchedMessage);
+            }
+          } else {
+            processMessage(message);
           }
         } catch (error) {
           logger.error(' Failed to parse message:', error);
         }
       };
+
+      // Process individual WebSocket messages
+      function processMessage(message: WebSocketMessage) {
+        if (message.type === 'execution_update' && message.data) {
+          callbacksRef.current.onExecutionUpdate?.(message.data as ExecutionUpdate);
+        } else if (message.type === 'screenshot_frame' && message.data) {
+          callbacksRef.current.onScreenshotFrame?.(message.data as ScreenshotFrame);
+        } else if (message.type === 'pong' || message.type === 'keepalive') {
+          // Heartbeat response - connection is alive
+          logger.debug(' Heartbeat received');
+        } else if (message.type === 'error') {
+          logger.error(' Server error:', message.error);
+        }
+      }
 
       ws.onerror = (event) => {
         logger.error(' Connection error:', event);

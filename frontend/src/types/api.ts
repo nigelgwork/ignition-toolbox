@@ -134,9 +134,12 @@ export interface ScreenshotFrame {
 }
 
 export interface WebSocketMessage {
-  type: 'execution_update' | 'screenshot_frame' | 'pong' | 'error';
+  type: 'execution_update' | 'screenshot_frame' | 'pong' | 'keepalive' | 'error' | 'batch';
   data?: ExecutionUpdate | ScreenshotFrame;
   error?: string;
+  // Batch message fields (for high-frequency updates like screenshots)
+  messages?: WebSocketMessage[];
+  count?: number;
 }
 
 // Enums
