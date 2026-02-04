@@ -70,12 +70,24 @@ _initPromise = initializeBackendUrl();
 class APIError extends Error {
   status: number;
   data?: unknown;
+  recoveryHint?: string;
 
-  constructor(message: string, status: number, data?: unknown) {
+  constructor(message: string, status: number, data?: unknown, recoveryHint?: string) {
     super(message);
     this.name = 'APIError';
     this.status = status;
     this.data = data;
+    this.recoveryHint = recoveryHint;
+  }
+
+  /**
+   * Format error message with recovery hint for display
+   */
+  getDisplayMessage(): string {
+    if (this.recoveryHint) {
+      return `${this.message}\n\nSuggestion: ${this.recoveryHint}`;
+    }
+    return this.message;
   }
 }
 
@@ -90,11 +102,24 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new APIError(
-      errorData.detail || `HTTP error ${response.status}`,
-      response.status,
-      errorData
-    );
+    // Extract message and recovery hint from structured error response
+    let message = `HTTP error ${response.status}`;
+    let recoveryHint: string | undefined;
+
+    if (typeof errorData.detail === 'object' && errorData.detail !== null) {
+      // Structured error response: { error, message, recovery_hint, details }
+      message = errorData.detail.message || message;
+      recoveryHint = errorData.detail.recovery_hint;
+    } else if (typeof errorData.detail === 'string') {
+      // Simple string error
+      message = errorData.detail;
+    } else if (errorData.message) {
+      // Alternative format
+      message = errorData.message;
+      recoveryHint = errorData.recovery_hint;
+    }
+
+    throw new APIError(message, response.status, errorData, recoveryHint);
   }
 
   return response.json();

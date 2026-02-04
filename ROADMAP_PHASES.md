@@ -208,7 +208,12 @@
   - ParameterInput: Credential selects, path fields, boolean parameters
   - ScheduleDialog: Schedule type, interval, weekly days, monthly day
   - AddAICredentialDialog: Provider, API key, model name, enable toggle
-- [ ] Improve error messages with recovery hints
+- [x] Improve error messages with recovery hints ✅ DONE (v1.4.71)
+  - Gateway exceptions now include recovery hints (auth, connection, module, restart)
+  - API error responses include recovery_hint field
+  - Frontend APIError class extracts and exposes recovery hints
+  - ErrorMessage component for displaying errors with suggestions
+  - formatErrorMessage helper for snackbar/toast messages
 - [x] Add step-by-step execution timeline view ✅ DONE (v1.4.71)
   - ExecutionTimeline component with visual timeline connector
   - Duration bars and step timing display
