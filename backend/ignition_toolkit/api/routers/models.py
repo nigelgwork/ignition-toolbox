@@ -7,7 +7,7 @@ Centralized model definitions to avoid duplication across routers.
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 
 # ============================================================================
 # Playbook Models
@@ -74,8 +74,9 @@ class ExecutionRequest(BaseModel):
     debug_mode: bool | None = False  # Enable debug mode for this execution
     timeout_overrides: dict[str, int] | None = None  # Per-playbook timeout overrides
 
-    @validator("parameters")
-    def validate_parameters(cls, v):
+    @field_validator("parameters")
+    @classmethod
+    def validate_parameters(cls, v: dict[str, Any]) -> dict[str, Any]:
         """Validate parameters to prevent injection attacks and DoS"""
         # Limit number of parameters
         if len(v) > 50:
@@ -102,8 +103,9 @@ class ExecutionRequest(BaseModel):
 
         return v
 
-    @validator("gateway_url")
-    def validate_gateway_url(cls, v):
+    @field_validator("gateway_url")
+    @classmethod
+    def validate_gateway_url(cls, v: str | None) -> str | None:
         """Validate gateway URL format"""
         if v is not None:
             if not v.startswith(("http://", "https://")):

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import yaml
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 
 from ignition_toolkit.api.routers.models import ParameterInfo, PlaybookInfo, StepInfo
 from ignition_toolkit.core.paths import (
@@ -51,8 +51,9 @@ class PlaybookMetadataUpdateRequest(BaseModel):
     name: str | None = None
     description: str | None = None
 
-    @validator('playbook_path')
-    def validate_playbook_path_field(cls, v):
+    @field_validator('playbook_path')
+    @classmethod
+    def validate_playbook_path_field(cls, v: str) -> str:
         """Validate playbook path field"""
         if not v or not v.strip():
             raise ValueError("Playbook path cannot be empty")
@@ -60,8 +61,9 @@ class PlaybookMetadataUpdateRequest(BaseModel):
             raise ValueError("Playbook path too long (max 500 characters)")
         return v.strip()
 
-    @validator('name')
-    def validate_name(cls, v):
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str | None) -> str | None:
         """Validate playbook name for security and sanity"""
         if v is None:
             return v
@@ -83,8 +85,9 @@ class PlaybookMetadataUpdateRequest(BaseModel):
 
         return v
 
-    @validator('description')
-    def validate_description(cls, v):
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: str | None) -> str | None:
         """Validate playbook description for security"""
         if v is None:
             return v
