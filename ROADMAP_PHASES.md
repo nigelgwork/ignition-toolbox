@@ -117,10 +117,10 @@
   - Test file permissions and security
   - Effort: 6h
 
-- [ ] **CloudDesigner Tests**
-  - Test Docker detection logic
-  - Test WSL path conversion
-  - Test container lifecycle
+- [x] **CloudDesigner Tests** ✅ DONE (v1.4.69)
+  - 31 tests for Docker utilities (path conversion, URL translation, WSL detection)
+  - Test Docker detection logic, WSL path conversion
+  - Platform-specific tests with proper skip markers
   - Effort: 6h
 
 ### 2.2 Integration Tests (~25h)
@@ -139,7 +139,10 @@
 - [x] Test WelcomeDialog component (6 tests)
 - [x] Test logger utility (5 tests)
 - [x] Test Zustand store (16 tests)
-- [ ] Test hooks (useWebSocket, useExecution)
+- [x] Test ErrorBoundary component (10 tests) ✅ DONE (v1.4.69)
+- [x] Test useWebSocket hook (16 tests) ✅ DONE (v1.4.69)
+  - Connection lifecycle, callbacks, heartbeat, reconnect with backoff
+- [ ] Test useExecution hook
 - [ ] Test more components (PlaybookCard, ExecutionStepper)
 - [ ] Effort: 15h
 
