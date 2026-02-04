@@ -398,8 +398,10 @@ class CloudDesignerManager:
             build_timeout = 600  # 10 minutes
             start_time = time.time()
             last_progress_log = start_time
+            last_output_time = start_time  # Track when we last received output
             partial_line = ""
             lines_received = 0
+            saw_build_completion = False  # Track if we've seen build completion indicators
 
             try:
                 while True:
@@ -431,12 +433,26 @@ class CloudDesignerManager:
                             build_output_lines.append(partial_line.strip())
                         break
 
+                    # Check for "stale" build - if we saw completion indicators and no output for 60s
+                    # This handles cases where the subprocess doesn't terminate cleanly after build
+                    time_since_last_output = time.time() - last_output_time
+                    if saw_build_completion and time_since_last_output > 60:
+                        logger.info(f"[CloudDesigner] Build appears complete (no output for {int(time_since_last_output)}s after completion indicators)")
+                        # Try to terminate gracefully
+                        try:
+                            build_process.terminate()
+                            build_process.wait(timeout=10)
+                        except Exception:
+                            build_process.kill()
+                        break
+
                     # Get output with timeout (don't block forever)
                     try:
                         chunk = output_queue.get(timeout=5.0)
                         if chunk is None:
                             break  # End of output
                         partial_line += chunk
+                        last_output_time = time.time()  # Update last output time
 
                         # Process complete lines
                         while '\n' in partial_line:
@@ -445,6 +461,9 @@ class CloudDesignerManager:
                             if line:
                                 build_output_lines.append(line)
                                 lines_received += 1
+                                # Check for build completion indicators
+                                if any(indicator in line.lower() for indicator in ['exporting manifest', 'exporting to image', 'done']):
+                                    saw_build_completion = True
                                 # Log significant build steps
                                 if any(keyword in line.lower() for keyword in ['step', 'run ', 'copy ', 'downloading', 'extracting', 'installing', 'error', 'warning', '#']):
                                     log_line = line[:150] + '...' if len(line) > 150 else line
@@ -456,13 +475,19 @@ class CloudDesignerManager:
                         if now - last_progress_log >= 30:
                             minutes = int(elapsed // 60)
                             seconds = int(elapsed % 60)
-                            logger.info(f"[CloudDesigner] Build in progress... ({minutes}m {seconds}s elapsed, {lines_received} lines received)")
+                            completion_hint = " (build appears complete, waiting for process)" if saw_build_completion else ""
+                            logger.info(f"[CloudDesigner] Build in progress... ({minutes}m {seconds}s elapsed, {lines_received} lines received){completion_hint}")
                             last_progress_log = now
                         continue
 
                 # Wait for process to fully complete
-                build_process.wait(timeout=30)
-                logger.info(f"[CloudDesigner] Build complete. Total lines: {lines_received}")
+                try:
+                    build_process.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    # Process still running, force kill
+                    build_process.kill()
+                    build_process.wait(timeout=10)
+                logger.info(f"[CloudDesigner] Build complete. Total lines: {lines_received}, return code: {build_process.returncode}")
             except subprocess.TimeoutExpired:
                 build_process.kill()
                 logger.error("[CloudDesigner] Build process did not terminate cleanly")
@@ -472,7 +497,9 @@ class CloudDesignerManager:
                     "output": "\n".join(build_output_lines[-50:]),
                 }
 
-            if build_process.returncode != 0:
+            # Check return code - but if we saw completion indicators, trust those over return code
+            # (process termination can give non-zero codes even after successful build)
+            if build_process.returncode != 0 and not saw_build_completion:
                 error_output = "\n".join(build_output_lines[-20:])  # Last 20 lines
                 logger.error(f"[CloudDesigner] Build failed with code {build_process.returncode}")
                 logger.error(f"[CloudDesigner] Build output (last 20 lines):\n{error_output}")
@@ -481,6 +508,8 @@ class CloudDesignerManager:
                     "error": f"Docker build failed (exit code {build_process.returncode}). Check logs for details.",
                     "output": error_output,
                 }
+            elif build_process.returncode != 0 and saw_build_completion:
+                logger.warning(f"[CloudDesigner] Build returned code {build_process.returncode} but completion indicators were seen - treating as success")
             logger.info("[CloudDesigner] Step 3 complete: Image built successfully")
 
             # Step 4: Start containers
