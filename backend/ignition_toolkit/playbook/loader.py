@@ -12,6 +12,7 @@ import yaml
 from ignition_toolkit.playbook.exceptions import (
     PlaybookLoadError,
     PlaybookValidationError,
+    YAMLParseError,
 )
 from ignition_toolkit.playbook.models import (
     OnFailureAction,
@@ -48,15 +49,35 @@ class PlaybookLoader:
             PlaybookValidationError: If playbook structure is invalid
         """
         if not file_path.exists():
-            raise PlaybookLoadError(f"Playbook file not found: {file_path}")
+            raise PlaybookLoadError(
+                "File not found",
+                file_path=str(file_path),
+                recovery_hint="Check that the playbook file exists and the path is correct",
+            )
 
         try:
             with open(file_path, encoding='utf-8') as f:
                 data = yaml.safe_load(f)
         except yaml.YAMLError as e:
-            raise PlaybookLoadError(f"Invalid YAML syntax: {e}")
-        except Exception as e:
-            raise PlaybookLoadError(f"Error reading file: {e}")
+            # Extract line number from YAML error
+            line_number = None
+            column = None
+            if hasattr(e, 'problem_mark') and e.problem_mark:
+                line_number = e.problem_mark.line + 1  # Convert to 1-indexed
+                column = e.problem_mark.column + 1
+
+            raise YAMLParseError(
+                message=str(e.problem) if hasattr(e, 'problem') else str(e),
+                file_path=str(file_path),
+                line_number=line_number,
+                column=column,
+            )
+        except IOError as e:
+            raise PlaybookLoadError(
+                f"Error reading file: {e}",
+                file_path=str(file_path),
+                recovery_hint="Check file permissions and that the file is not locked",
+            )
 
         return PlaybookLoader._parse_playbook(data, file_path)
 
@@ -78,7 +99,18 @@ class PlaybookLoader:
         try:
             data = yaml.safe_load(yaml_content)
         except yaml.YAMLError as e:
-            raise PlaybookLoadError(f"Invalid YAML syntax: {e}")
+            # Extract line number from YAML error
+            line_number = None
+            column = None
+            if hasattr(e, 'problem_mark') and e.problem_mark:
+                line_number = e.problem_mark.line + 1  # Convert to 1-indexed
+                column = e.problem_mark.column + 1
+
+            raise YAMLParseError(
+                message=str(e.problem) if hasattr(e, 'problem') else str(e),
+                line_number=line_number,
+                column=column,
+            )
 
         return PlaybookLoader._parse_playbook(data, None)
 

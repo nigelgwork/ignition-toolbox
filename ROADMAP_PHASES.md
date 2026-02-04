@@ -51,16 +51,23 @@
   - `routers/stackbuilder/main.py` - Router with all endpoints
   - Effort: 10h
 
-- [ ] Split `api/routers/executions.py` (953 lines):
-  - Extract scheduling to `routers/scheduling.py`
+- [x] Split `api/routers/executions.py` (953 lines) into: ✅ DONE (v1.4.68)
+  - `routers/executions/models.py` - Pydantic request/response models
+  - `routers/executions/helpers.py` - ExecutionContext, helper functions, background tasks
+  - `routers/executions/main.py` - Router with all endpoints
   - Effort: 8h
 
 ### 1.2 Error Handling Improvements (~15h)
 
-- [ ] Replace generic `Exception` catches with specific types
-- [ ] Add `recovery_hint` field to custom exceptions
-- [ ] Include YAML line numbers in parser errors
-- [ ] Add WebSocket reconnection with exponential backoff
+- [x] Add `recovery_hint` field to custom exceptions ✅ DONE (v1.4.68)
+  - Enhanced `playbook/exceptions.py` with recovery hints
+  - Added `YAMLParseError` with line/column information
+  - Added `BrowserNotAvailableError`, `GatewayNotConfiguredError`
+- [x] Include YAML line numbers in parser errors ✅ DONE (v1.4.68)
+  - Updated `playbook/loader.py` to extract line numbers from YAML errors
+- [x] WebSocket reconnection with exponential backoff ✅ Already implemented
+  - `useWebSocket.ts` has backoff multiplier of 1.5x, max 30s
+- [ ] Replace generic `Exception` catches with specific types (ongoing - 243 occurrences)
 - [ ] Effort: 15h
 
 ### 1.3 Logging Standardization (~15h)
@@ -70,8 +77,11 @@
   - Generated script content (ignition_db_registration.py) - keep as print()
   - Docstring examples - keep as print()
   - Fixed 1 actual logging issue in auth.py
-- [ ] Standardize log levels across all modules
-- [ ] Remove debug `console.log` from production frontend
+- [x] Create frontend logging utility ✅ DONE (v1.4.68)
+  - Added `frontend/src/utils/logger.ts` - createLogger() with scoped prefixes
+  - Debug logs disabled in production builds
+  - Updated `useWebSocket.ts` to use new logger
+- [ ] Continue migrating console.log to logger (91 occurrences across 19 files)
 - [ ] Effort: 15h
 
 ---
@@ -89,16 +99,21 @@
   - Test variable interpolation
   - Effort: 16h
 
+- [x] **Playbook Loader Tests** ✅ DONE (v1.4.68)
+  - 19 tests covering YAML parsing, validation, error handling
+  - Tests for YAMLParseError with line numbers
+  - Tests for parameter and step validation
+
 - [ ] **API Endpoint Tests**
   - Test all CRUD operations
   - Test validation errors
   - Test authentication (if added)
   - Effort: 12h
 
-- [ ] **Credential Vault Tests**
-  - Test encryption/decryption
-  - Test key rotation
-  - Test invalid credentials handling
+- [x] **Credential Vault Tests** ✅ DONE (v1.4.68)
+  - 20 tests covering encryption/decryption
+  - Test persistence, edge cases, special characters
+  - Test file permissions and security
   - Effort: 6h
 
 - [ ] **CloudDesigner Tests**

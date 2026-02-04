@@ -1,0 +1,3 @@
+"""
+Credential vault tests package
+"""

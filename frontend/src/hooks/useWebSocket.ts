@@ -5,6 +5,9 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { WebSocketMessage, ExecutionUpdate, ScreenshotFrame } from '../types/api';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('WebSocket');
 
 // WebSocket URL - supports both web and Electron modes
 // In Electron: constructed from IPC-provided backend URL
@@ -22,9 +25,9 @@ export async function initializeWebSocketUrl(): Promise<void> {
     try {
       const baseWsUrl = await window.electronAPI.getWebSocketUrl();
       WS_URL = `${baseWsUrl}/ws/executions`;
-      console.log('Using Electron WebSocket URL:', WS_URL);
+      logger.info('Using Electron WebSocket URL:', WS_URL);
     } catch (error) {
-      console.error('Failed to get Electron WebSocket URL:', error);
+      logger.error('Failed to get Electron WebSocket URL:', error);
       // Fallback to default
       WS_URL = 'ws://127.0.0.1:5000/ws/executions';
     }
@@ -99,7 +102,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       const ws = new WebSocket(`${WS_URL}?api_key=${WS_API_KEY}`);
 
       ws.onopen = () => {
-        console.log('[WebSocket] Connected successfully');
+        logger.info(' Connected successfully');
         setConnectionStatus('connected');
 
         // Reset reconnect state on successful connection
@@ -129,23 +132,23 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             callbacksRef.current.onScreenshotFrame?.(message.data as ScreenshotFrame);
           } else if (message.type === 'pong') {
             // Heartbeat response - connection is alive
-            console.debug('[WebSocket] Heartbeat received');
+            logger.debug(' Heartbeat received');
           } else if (message.type === 'error') {
-            console.error('[WebSocket] Server error:', message.error);
+            logger.error(' Server error:', message.error);
           }
         } catch (error) {
-          console.error('[WebSocket] Failed to parse message:', error);
+          logger.error(' Failed to parse message:', error);
         }
       };
 
       ws.onerror = (event) => {
-        console.error('[WebSocket] Connection error:', event);
+        logger.error(' Connection error:', event);
         setConnectionStatus('disconnected');
         callbacksRef.current.onError?.(event);
       };
 
       ws.onclose = (event) => {
-        console.log('[WebSocket] Disconnected', event.code, event.reason);
+        logger.info(' Disconnected', event.code, event.reason);
         setConnectionStatus('disconnected');
 
         // Clear heartbeat interval
@@ -179,7 +182,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
       wsRef.current = ws;
     } catch (error) {
-      console.error('[WebSocket] Connection failed:', error);
+      logger.error(' Connection failed:', error);
       setConnectionStatus('disconnected');
     }
   }, []); // ✅ NO dependencies - callbacks stored in refs
