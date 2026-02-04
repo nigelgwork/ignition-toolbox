@@ -8,7 +8,7 @@ This file provides guidance to Claude Code when working with the Ignition Toolbo
 
 **Ignition Toolbox** is a distributable desktop application for visual acceptance testing of Ignition SCADA systems. It packages the Ignition Automation Toolkit as a standalone Electron app with an embedded Python backend.
 
-**Current Version:** 1.4.68
+**Current Version:** 1.4.69
 **Architecture:** Electron + Python subprocess
 **Target Platform:** Windows (primary), cross-platform possible
 **Key Technologies:** Electron, TypeScript, React 19, FastAPI, Playwright, SQLite
@@ -214,9 +214,9 @@ GitHub Actions workflows in `.github/workflows/`:
 
 ---
 
-**Last Updated**: 2026-02-03
+**Last Updated**: 2026-02-04
 **Maintainer**: Nigel G
-**Status**: Production Ready (v1.4.68)
+**Status**: Production Ready (v1.4.69)
 
 ## Development Phases
 
