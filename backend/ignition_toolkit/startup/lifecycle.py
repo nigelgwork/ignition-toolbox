@@ -7,7 +7,7 @@ context manager pattern.
 
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, UTC
 
 from fastapi import FastAPI
 
@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
     Yields control to FastAPI to handle requests, then cleans up on shutdown.
     """
     health = get_health_state()
-    start_time = datetime.utcnow()
+    start_time = datetime.now(UTC)
 
     logger.info("=" * 60)
     logger.info("Ignition Automation Toolkit - Startup")
@@ -161,7 +161,7 @@ async def lifespan(app: FastAPI):
 
         # Mark system ready
         health.ready = True
-        health.startup_time = datetime.utcnow()
+        health.startup_time = datetime.now(UTC)
 
         # Determine overall health
         if health.errors:
@@ -172,7 +172,7 @@ async def lifespan(app: FastAPI):
             health.overall = HealthStatus.HEALTHY
 
         # Startup summary
-        elapsed = (datetime.utcnow() - start_time).total_seconds()
+        elapsed = (datetime.now(UTC) - start_time).total_seconds()
         logger.info("=" * 60)
         logger.info(f"[OK] System Ready (Startup time: {elapsed:.2f}s)")
         logger.info(f"   Overall Status: {health.overall.value.upper()}")

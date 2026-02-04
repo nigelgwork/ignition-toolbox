@@ -6,7 +6,7 @@ and debugging.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 
 
@@ -33,7 +33,7 @@ class ComponentHealth:
 
     status: HealthStatus
     message: str = ""
-    last_checked: datetime = field(default_factory=datetime.utcnow)
+    last_checked: datetime = field(default_factory=lambda: datetime.now(UTC))
     error: str | None = None
 
     def to_dict(self) -> dict:
