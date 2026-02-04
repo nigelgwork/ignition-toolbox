@@ -6,7 +6,7 @@
  * Can be popped out into a separate window for easier operation.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import {
   Box,
   Dialog,
@@ -29,6 +29,9 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+
+// Lazy load Monaco Editor to avoid large initial bundle
+const MonacoEditor = lazy(() => import('@monaco-editor/react'));
 
 interface PlaybookCodeViewerProps {
   open: boolean;
@@ -333,31 +336,34 @@ export function PlaybookCodeViewer({
         )}
 
         {!isLoading && !error && (
-          <Box
-            component="textarea"
-            value={code}
-            onChange={(e) => handleCodeChange(e.target.value)}
-            readOnly={!canEdit}
-            sx={{
-              flexGrow: 1,
-              width: '100%',
-              fontFamily: '"Fira Code", "Monaco", "Courier New", monospace',
-              fontSize: '0.875rem',
-              lineHeight: 1.6,
-              p: 2,
-              m: 2,
-              border: 1,
-              borderColor: 'divider',
-              borderRadius: 1,
-              bgcolor: canEdit ? 'background.default' : 'action.disabledBackground',
-              color: 'text.primary',
-              resize: 'none',
-              '&:focus': {
-                outline: 'none',
-                borderColor: 'primary.main',
-              },
-            }}
-          />
+          <Box sx={{ flexGrow: 1, minHeight: 0, m: 2 }}>
+            <Suspense fallback={
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                <CircularProgress />
+              </Box>
+            }>
+              <MonacoEditor
+                height="100%"
+                language="yaml"
+                theme="vs-dark"
+                value={code}
+                onChange={(value) => handleCodeChange(value || '')}
+                options={{
+                  readOnly: !canEdit,
+                  minimap: { enabled: true },
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  wordWrap: 'on',
+                  folding: true,
+                  tabSize: 2,
+                  automaticLayout: true,
+                  renderWhitespace: 'selection',
+                  bracketPairColorization: { enabled: true },
+                }}
+              />
+            </Suspense>
+          </Box>
         )}
 
         {/* Footer with unsaved changes warning */}

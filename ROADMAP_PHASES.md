@@ -195,11 +195,12 @@
   - Auto-rename with "(Copy)" suffix
   - Effort: 8h
 
-- [ ] **Playbook YAML Editor UI**
-  - Monaco editor integration
+- [x] **Playbook YAML Editor UI** ✅ DONE (v1.4.68)
+  - Monaco editor integration with @monaco-editor/react
   - Syntax highlighting for YAML
-  - Real-time validation
-  - Save/cancel with confirmation
+  - Lazy-loaded to avoid bundle bloat
+  - Code folding, minimap, line numbers
+  - Read-only when not in debug/paused mode
   - Effort: 24h
 
 - [ ] **Form-based Playbook Editor**
