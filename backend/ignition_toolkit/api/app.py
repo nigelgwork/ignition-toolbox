@@ -214,6 +214,12 @@ if frontend_dist.exists() and (frontend_dist / "index.html").exists():
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         """Serve React SPA - returns index.html for all non-API routes with no-cache headers"""
+        # Check if this is a static file that exists in frontend_dist
+        if full_path:
+            static_file = frontend_dist / full_path
+            if static_file.exists() and static_file.is_file():
+                return FileResponse(str(static_file))
+
         # Serve index.html for all other routes (React Router handles routing)
         index_path = frontend_dist / "index.html"
         response = FileResponse(str(index_path))
