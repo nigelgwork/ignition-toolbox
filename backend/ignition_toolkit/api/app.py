@@ -62,6 +62,9 @@ app.include_router(health_router)
 # Register config router (for portability)
 app.include_router(config_router)
 
+# Register Step Types router BEFORE playbooks (to avoid catch-all path conflict)
+app.include_router(step_types_router)
+
 # Register playbooks router
 app.include_router(playbooks_router)
 
@@ -101,8 +104,7 @@ app.include_router(websockets_router)
 # Register Logs router (for UI log access)
 app.include_router(logs_router)
 
-# Register Step Types router (for form-based playbook editor)
-app.include_router(step_types_router)
+# Note: Step Types router registered earlier (before playbooks) to avoid path conflict
 
 # Register Baselines router (for visual testing)
 app.include_router(baselines_router)

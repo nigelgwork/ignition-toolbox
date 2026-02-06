@@ -244,7 +244,7 @@ function ParameterInput({
   credentials: CredentialInfo[];
   onChange: (value: any) => void;
 }) {
-  // Handle file browse (Electron native dialog)
+  // Handle file browse (Electron native dialog with web fallback)
   const handleBrowseFile = async () => {
     if (window.electronAPI?.openFileDialog) {
       try {
@@ -257,6 +257,12 @@ function ParameterInput({
         }
       } catch (error) {
         console.error('Failed to open file dialog:', error);
+      }
+    } else {
+      // Web mode: prompt user for file path
+      const path = window.prompt('Enter file path:');
+      if (path) {
+        onChange(path);
       }
     }
   };

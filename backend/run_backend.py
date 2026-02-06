@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-Backend entry point for Electron subprocess.
+Backend entry point for the Ignition Toolkit server.
 
 This script starts the FastAPI server with configuration from environment variables.
-It's designed to be spawned by the Electron main process.
+It supports multiple deployment modes:
+- Electron subprocess (spawned by the Electron main process)
+- Docker container (configured via environment variables)
+- Standalone (run directly with Python)
 """
 
 import os
@@ -51,7 +54,7 @@ def main():
     """Start the FastAPI backend server."""
     import uvicorn
 
-    # Get configuration from environment variables (set by Electron)
+    # Get configuration from environment variables (set by Electron or Docker)
     host = os.environ.get("IGNITION_TOOLKIT_HOST", "127.0.0.1")
     port = int(os.environ.get("IGNITION_TOOLKIT_PORT", "5000"))
 
