@@ -22,7 +22,6 @@ from ignition_toolkit.playbook.executors.gateway_executor import (
 )
 from ignition_toolkit.playbook.executors.browser_executor import (
     BrowserClickHandler,
-    BrowserCompareScreenshotHandler,
     BrowserFillHandler,
     BrowserFileUploadHandler,
     BrowserNavigateHandler,
@@ -91,7 +90,6 @@ __all__ = [
     "BrowserVerifyTextHandler",
     "BrowserVerifyAttributeHandler",
     "BrowserVerifyStateHandler",
-    "BrowserCompareScreenshotHandler",
     # Designer
     "DesignerLaunchHandler",
     "DesignerLaunchShortcutHandler",

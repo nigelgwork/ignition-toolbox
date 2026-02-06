@@ -21,7 +21,6 @@ from ignition_toolkit.playbook.parameters import ParameterResolver
 # Import step handlers
 from ignition_toolkit.playbook.executors import (
     BrowserClickHandler,
-    BrowserCompareScreenshotHandler,
     BrowserFillHandler,
     BrowserFileUploadHandler,
     BrowserNavigateHandler,
@@ -166,7 +165,6 @@ class StepExecutor:
             handlers[StepType.BROWSER_VERIFY_TEXT] = BrowserVerifyTextHandler(self.browser_manager)
             handlers[StepType.BROWSER_VERIFY_ATTRIBUTE] = BrowserVerifyAttributeHandler(self.browser_manager)
             handlers[StepType.BROWSER_VERIFY_STATE] = BrowserVerifyStateHandler(self.browser_manager)
-            handlers[StepType.BROWSER_COMPARE_SCREENSHOT] = BrowserCompareScreenshotHandler(self.browser_manager)
 
         # Designer handlers
         if self.designer_manager:
