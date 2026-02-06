@@ -4,7 +4,7 @@
 **Last Updated:** 2025-10-27
 **Audience:** Playbook authors and test engineers
 
-This guide provides best practices for writing maintainable, reliable, and reusable playbooks in the Ignition Automation Toolkit.
+This guide provides best practices for writing maintainable, reliable, and reusable playbooks in Ignition Toolbox.
 
 ---
 

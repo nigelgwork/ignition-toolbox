@@ -1,8 +1,8 @@
 # Architecture Documentation
 
-**Project:** Ignition Automation Toolkit
-**Last Updated:** 2025-11-21
-**Version:** 5.0.0
+**Project:** Ignition Toolbox
+**Last Updated:** 2026-02-06
+**Version:** 1.5.0
 
 This document provides comprehensive architecture documentation including system design, component interactions, data flow, and key architectural decisions (ADRs).
 
@@ -21,7 +21,63 @@ This document provides comprehensive architecture documentation including system
 
 ## System Architecture Overview
 
-The Ignition Automation Toolkit is a **visual acceptance testing platform** for Ignition SCADA with three main architectural layers:
+```mermaid
+graph TB
+    subgraph Electron["Electron Desktop App"]
+        Main["Main Process<br/>(TypeScript)"]
+        Renderer["Renderer Process<br/>(React 19 + MUI v7)"]
+    end
+
+    subgraph Backend["Python Backend (FastAPI :5000)"]
+        API["REST API +<br/>WebSocket"]
+        Engine["Playbook Engine<br/>(44 step types)"]
+        PW["Playwright<br/>Browser Automation"]
+        GW["Gateway Client"]
+        Vault["Credential Vault<br/>(Fernet)"]
+        DB["SQLite"]
+        CDM["CloudDesigner<br/>Manager"]
+        SBM["Stack Builder"]
+    end
+
+    subgraph External["External Systems"]
+        IG["Ignition Gateway"]
+        Docker["Docker Engine"]
+    end
+
+    Main -->|spawns| API
+    Main <-->|IPC| Renderer
+    Renderer -->|HTTP / WS| API
+    API --> Engine
+    Engine --> PW
+    Engine --> GW
+    Engine --> Vault
+    Engine --> DB
+    API --> CDM
+    API --> SBM
+    GW --> IG
+    PW -->|browser| IG
+    CDM -->|Docker CLI| Docker
+    SBM -->|Docker Compose| Docker
+```
+
+Ignition Toolbox is a **visual acceptance testing platform** for Ignition SCADA with the following architectural layers:
+
+### Electron Main Process
+
+The Electron main process (`electron/`) manages the application lifecycle:
+
+| File | Purpose |
+|------|---------|
+| `main.ts` | App entry, window creation, lifecycle |
+| `preload.ts` | Context bridge exposing IPC to renderer |
+| `services/python-backend.ts` | Spawns and monitors the Python subprocess |
+| `services/auto-updater.ts` | GitHub-based auto-updates |
+| `services/settings.ts` | Persistent app settings (electron-store) |
+| `ipc/handlers.ts` | IPC handler registration |
+
+The main process spawns the Python backend as a child process and communicates with the renderer via IPC. In development, the renderer loads from the Vite dev server; in production, it loads from the bundled frontend build.
+
+### Backend + Frontend Layers
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -64,9 +120,9 @@ The Ignition Automation Toolkit is a **visual acceptance testing platform** for 
 ┌─────────┼─────────────────────┼────────────────────┼─────────────┐
 │                      External Systems                            │
 │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐   │
-│  │   Ignition     │  │   Perspective  │  │  Anthropic     │   │
-│  │   Gateway      │  │   Web Client   │  │   Claude API   │   │
-│  │  (REST API)    │  │   (Browser)    │  │  (Optional)    │   │
+│  │   Ignition     │  │   Perspective  │  │  Docker        │   │
+│  │   Gateway      │  │   Web Client   │  │  Engine        │   │
+│  │  (REST API)    │  │   (Browser)    │  │  (Containers)  │   │
 │  └────────────────┘  └────────────────┘  └────────────────┘   │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -132,10 +188,18 @@ The Ignition Automation Toolkit is a **visual acceptance testing platform** for 
 
 ```
 frontend/src/
-├── pages/                    # Top-level pages
+├── pages/                    # Top-level pages (11 pages)
 │   ├── Playbooks.tsx         # Playbook library management
 │   ├── Executions.tsx        # Live execution monitoring
-│   └── Credentials.tsx       # Credential management
+│   ├── ExecutionDetail.tsx   # Step-by-step results + screenshots
+│   ├── Credentials.tsx       # Credential management
+│   ├── AICredentials.tsx     # AI API key management
+│   ├── Designer.tsx          # CloudDesigner (Docker-based)
+│   ├── StackBuilder.tsx      # Docker Compose generator
+│   ├── Baselines.tsx         # Visual baseline management
+│   ├── APIExplorer.tsx       # Interactive API browser
+│   ├── Settings.tsx          # Application settings
+│   └── About.tsx             # Version info + system status
 │
 ├── components/               # Reusable UI components
 │   ├── PlaybookCard.tsx      # Playbook display card
@@ -209,8 +273,25 @@ ignition_toolkit/
 │   ├── assistant.py          # Claude API integration
 │   └── prompts.py            # Prompt templates
 │
-└── cli/                      # Command-line interface
-    └── main.py               # Click CLI commands (init, credential, serve)
+├── clouddesigner/            # CloudDesigner
+│   ├── manager.py            # Docker container lifecycle for Designers
+│   └── docker_files/         # Dockerfiles, nginx config, compose
+│
+├── stackbuilder/             # Stack Builder
+│   ├── builder.py            # Docker Compose generation
+│   └── services/             # Service catalog (25+ services)
+│
+├── auth/                     # Authentication + authorization
+│   └── api_keys.py           # API key management, RBAC
+│
+├── execution/                # Execution queue
+│   └── queue.py              # Parallel execution with resource limiting
+│
+├── reporting/                # Reports + analytics
+│   └── generator.py          # Trend reports, CSV/PDF exports
+│
+└── designer/                 # Designer automation
+    └── manager.py            # Designer step handlers
 ```
 
 **Key Backend Patterns:**
@@ -688,10 +769,10 @@ We needed a format for playbook definitions that would be:
 
 ---
 
-## ADR-003: No Docker / Native Python
+## ADR-003: No Docker / Native Python (for core app)
 
 **Date:** 2025-10-24
-**Status:** Accepted ✅
+**Status:** Accepted ✅ (Superseded in part: Docker is now used for CloudDesigner and Stack Builder features, but the core app still runs natively)
 
 ### Context
 
@@ -788,10 +869,10 @@ We needed persistent storage for execution history, step results, and configurat
 
 ---
 
-## ADR-005: React 18 with Material-UI for Frontend
+## ADR-005: React with Material-UI for Frontend
 
 **Date:** 2025-10-24
-**Status:** Accepted ✅
+**Status:** Accepted ✅ (Updated: now React 19 + MUI v7)
 
 ### Context
 
@@ -805,7 +886,7 @@ Frontend needed to provide visual feedback, real-time updates, and modern UX.
 
 ### Decision
 
-**We chose React 18 + TypeScript** with Material-UI v5.
+**We chose React + TypeScript** with Material-UI (currently React 19 + MUI v7).
 
 ### Rationale
 
@@ -1317,9 +1398,9 @@ ignition_toolkit/api/
 |-----|----------|-----------|
 | ADR-001 | Domain-separated playbooks | Simpler execution model, clearer organization |
 | ADR-002 | YAML for playbooks | Human-readable, easy to duplicate and modify |
-| ADR-003 | Native Python (no Docker) | Simpler deployment, faster development |
+| ADR-003 | Native Python (no Docker for core) | Simpler deployment, faster development |
 | ADR-004 | SQLite for storage | Single-file, portable, zero configuration |
-| ADR-005 | React 18 + Material-UI | Modern UX, component reusability, TypeScript |
+| ADR-005 | React 19 + Material-UI v7 | Modern UX, component reusability, TypeScript |
 | ADR-006 | Zustand state management | Minimal boilerplate, hooks-based, lightweight |
 | ADR-007 | Fernet encryption | Secure, simple API, authenticated encryption |
 | ADR-008 | Playwright automation | Modern API, fast, auto-wait, Python support |

@@ -153,7 +153,7 @@ If you discover a security vulnerability:
 
 ## Audit Log
 
-The application does not currently maintain a security audit log. This is planned for Phase 6 (Multi-User Support).
+Audit logging was implemented in Phase 6 (v1.5.0) as part of Multi-User Support. API key authentication, RBAC, and audit trails are available for production deployments.
 
 ## Environment Variables
 

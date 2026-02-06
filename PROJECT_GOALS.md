@@ -1,8 +1,8 @@
-# Ignition Automation Toolkit - Project Goals
+# Ignition Toolbox - Project Goals
 
-**Version:** 5.0.0
-**Last Updated:** 2025-11-21
-**Status:** Production Ready (Phase 8/8 Complete)
+**Version:** 1.5.0
+**Last Updated:** 2026-02-06
+**Status:** Production Ready (All Phases Complete)
 
 ---
 
@@ -56,7 +56,7 @@ Some acceptance testing steps require intelligent decision-making that humans OR
 
 ## Solution Overview
 
-**Ignition Automation Toolkit is a visual acceptance testing platform for Ignition SCADA with domain-separated playbook libraries, real-time visual feedback, and optional AI-assisted test creation and verification.**
+**Ignition Toolbox is a visual acceptance testing platform for Ignition SCADA with domain-separated playbook libraries, real-time visual feedback, and optional AI-assisted test creation and verification.**
 
 ### Core Capabilities
 
@@ -757,8 +757,8 @@ To prevent future confusion, this is the single source of truth for project goal
 
 ---
 
-**Last Updated:** 2025-11-21
+**Last Updated:** 2026-02-06
 **Maintainer:** Nigel G
-**Status:** Production Ready (v5.0.0)
+**Status:** Production Ready (v1.5.0)
 
-**Next Steps:** See [ROADMAP.md](/docs/ROADMAP.md) for planned features.
+**Next Steps:** See [ROADMAP_PHASES.md](/ROADMAP_PHASES.md) for development history.

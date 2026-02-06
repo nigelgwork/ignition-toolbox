@@ -1,7 +1,7 @@
 # Playbook Library - User Guide
 
-**Version:** 5.1.0
-**Last Updated:** 2025-11-21
+**Version:** 1.5.0
+**Last Updated:** 2026-02-06
 
 ## Overview
 
@@ -11,7 +11,7 @@ The Playbook Library is a plugin architecture that allows you to browse, install
 
 ### Playbook Sources
 
-There are three types of playbooks in v5.0:
+There are three types of playbooks:
 
 1. **Built-in Playbooks** (6 base playbooks)
    - Bundled with the toolkit installation
@@ -184,12 +184,12 @@ The central repository uses GitHub Releases:
 
 ### Repository URL
 ```
-https://github.com/nigelgwork/ignition-playground
+https://github.com/nigelgwork/ignition-toolbox
 ```
 
 ### Playbooks Index
 ```
-https://github.com/nigelgwork/ignition-playground/releases/latest/download/playbooks-index.json
+https://github.com/nigelgwork/ignition-toolbox/releases/latest/download/playbooks-index.json
 ```
 
 ### Index Format
@@ -280,26 +280,6 @@ https://github.com/nigelgwork/ignition-playground/releases/latest/download/playb
 - Groups appear as nested accordions in the UI
 - Example: `group: "Gateway (Base Playbooks)"`
 
-### 5. Test After Migration
-- After upgrading to v5.0, test all critical playbooks
-- Verify credentials still work
-- Check execution history is preserved
-
----
-
-## Migration from v4.x to v5.0
-
-See [MIGRATION_V5.md](MIGRATION_V5.md) for detailed migration instructions.
-
-**Quick Migration:**
-```bash
-# Automatic migration
-python scripts/migrate-to-v5.py
-
-# With cleanup (removes old playbooks directory)
-python scripts/migrate-to-v5.py --clean
-```
-
 ---
 
 ## API Reference
@@ -370,7 +350,6 @@ A: "user-installed" = downloaded from repository, "user-created" = you wrote it 
 
 ## See Also
 
-- [Migration Guide (v5.0)](MIGRATION_V5.md)
 - [Playbook Syntax Reference](playbook_syntax.md)
-- [Getting Started Guide](getting_started.md)
+- [Developer Guide](DEVELOPER_GUIDE.md)
 - [Architecture Documentation](../ARCHITECTURE.md)

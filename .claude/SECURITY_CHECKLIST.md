@@ -1,6 +1,6 @@
-# Security Checklist - Ignition Automation Toolkit
+# Security Checklist - Ignition Toolbox
 
-**Project**: Ignition Automation Toolkit
+**Project**: Ignition Toolbox
 **Security Level**: Medium (Development/Testing Environment)
 **Last Audit**: 2025-10-22
 

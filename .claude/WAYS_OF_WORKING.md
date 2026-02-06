@@ -1,7 +1,7 @@
-# Ways of Working - Ignition Automation Toolkit
+# Ways of Working - Ignition Toolbox
 
 **Team**: Nigel G + Claude Code
-**Project**: Ignition Automation Toolkit
+**Project**: Ignition Toolbox
 **Start Date**: October 2025
 
 ---
@@ -26,17 +26,16 @@
 ## 📅 Development Workflow
 
 ### Phase-Based Development:
-We work in distinct phases (see PLAN.md):
-1. Foundation ✅
-2. Gateway Client ✅
-3. Playbook Engine 🚧
-4. Import/Export
-5. Frontend Migration
-6. Browser Automation
-7. AI Scaffolding
-8. Testing & Docs
+All development phases are complete (see `ROADMAP_PHASES.md`):
+- Phase 0: Critical Updates ✅
+- Phase 1: Code Quality & Stability ✅
+- Phase 2: Testing Foundation ✅
+- Phase 3: Documentation & UX ✅
+- Phase 4: Feature Completion ✅
+- Phase 5: Performance & Scale ✅
+- Phase 6: Advanced Features ✅
 
-**Rule**: Complete one phase before moving to next. No jumping ahead.
+**Status**: Project is in maintenance mode. Future work focuses on bug fixes, dependency updates, and user-requested features.
 
 ### Daily Workflow:
 1. **Review PROGRESS.md** - Check current status
@@ -367,6 +366,6 @@ Saved.
 
 ---
 
-**Last Updated**: 2025-10-22
-**Next Review**: Monthly or when process needs adjustment
-**Status**: Phase 2 Complete, Phase 3 Next
+**Last Updated**: 2026-02-06
+**Next Review**: As needed
+**Status**: All phases complete, maintenance mode

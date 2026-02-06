@@ -164,6 +164,11 @@ The Python backend is the full Ignition Automation Toolkit:
 | `ignition_toolkit/gateway/` | Ignition Gateway REST client |
 | `ignition_toolkit/credentials/` | Fernet-encrypted credential vault |
 | `ignition_toolkit/storage/` | SQLite database |
+| `ignition_toolkit/clouddesigner/` | Docker-based Designer launcher |
+| `ignition_toolkit/stackbuilder/` | Docker Compose generator (25+ services) |
+| `ignition_toolkit/auth/` | API key authentication + RBAC |
+| `ignition_toolkit/execution/` | Parallel execution queue |
+| `ignition_toolkit/reporting/` | Analytics and report exports |
 
 ### Frontend (`frontend/`)
 
@@ -171,11 +176,13 @@ React 19 + TypeScript + Material-UI v7 frontend:
 
 | Directory | Purpose |
 |-----------|---------|
-| `src/pages/` | Main pages (Playbooks, Executions, Credentials) |
+| `src/pages/` | 11 pages: Playbooks, Executions, ExecutionDetail, Credentials, AICredentials, Designer, StackBuilder, Baselines, APIExplorer, Settings, About |
 | `src/components/` | Reusable UI components |
 | `src/hooks/` | WebSocket hook, playbook order hook |
 | `src/store/` | Zustand global state |
 | `src/api/` | HTTP API client |
+
+> **Docker features vs Docker deployment:** CloudDesigner and StackBuilder are *features* that manage Docker containers for Ignition infrastructure. The `docker-compose.yml` at project root is for *deploying* the Toolbox itself in containers. These are independent concerns.
 
 ## Core Principles
 

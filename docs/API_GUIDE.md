@@ -279,7 +279,7 @@ GET /api/health
 ```json
 {
   "status": "healthy",
-  "version": "1.4.68",
+  "version": "1.5.0",
   "uptime_seconds": 3600
 }
 ```
@@ -371,7 +371,7 @@ All error responses follow this format:
 
 ## Rate Limiting
 
-Currently, no rate limiting is implemented. This is planned for Phase 6.
+Rate limiting is available through the API key authentication system (see SECURITY.md).
 
 ## Examples
 
@@ -433,5 +433,5 @@ setInterval(() => {
 
 ---
 
-**Last Updated**: 2026-02-04
-**API Version**: 1.4.68
+**Last Updated**: 2026-02-06
+**API Version**: 1.5.0
