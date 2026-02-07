@@ -3,7 +3,7 @@
  */
 
 import { create } from 'zustand';
-import type { ExecutionUpdate, CredentialInfo } from '../types/api';
+import type { ExecutionUpdate, CredentialInfo, ScreenshotFrame } from '../types/api';
 
 // Initialize theme from localStorage or default to 'dark'
 const getInitialTheme = (): 'dark' | 'light' => {
@@ -25,12 +25,6 @@ const getInitialPlaybookGridColumns = (): PlaybookGridColumns => {
   const parsed = stored ? parseInt(stored, 10) : 5;
   return (parsed === 3 || parsed === 4 || parsed === 5 || parsed === 6) ? parsed : 5;
 };
-
-interface ScreenshotFrame {
-  executionId: string;
-  screenshot: string; // base64 encoded JPEG
-  timestamp: string;
-}
 
 // Session-only credential (not saved to vault)
 interface SessionCredential {

@@ -26,6 +26,150 @@ import type {
 } from '../types/api';
 import { createLogger } from '../utils/logger';
 
+// ============================================================
+// API response types for StackBuilder, API Explorer, and others
+// ============================================================
+
+/** API Explorer - stored API key info */
+export interface ApiKeyInfo {
+  name: string;
+  gateway_url: string;
+  description?: string;
+  created_at?: string;
+}
+
+/** API Explorer - gateway info response */
+export interface GatewayInfoResponse {
+  platform: string;
+  version: string;
+  edition: string;
+  state: string;
+  [key: string]: unknown;
+}
+
+/** API Explorer - OpenAPI spec response */
+export interface OpenAPIResponse {
+  openapi: string;
+  info: { title: string; version: string; [key: string]: unknown };
+  paths: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** API Explorer - resource list response */
+export interface ResourceListResponse {
+  resources: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+}
+
+/** API Explorer - request execution response */
+export interface ExplorerRequestResponse {
+  status_code: number;
+  headers: Record<string, string>;
+  body: unknown;
+  elapsed_ms: number;
+}
+
+/** StackBuilder - catalog response */
+export interface StackBuilderCatalog {
+  applications: StackBuilderApplication[];
+  categories: StackBuilderCategory[];
+}
+
+/** StackBuilder - application entry */
+export interface StackBuilderApplication {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  icon?: string;
+  default_config: Record<string, unknown>;
+  config_schema: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** StackBuilder - category entry */
+export interface StackBuilderCategory {
+  id: string;
+  name: string;
+  description: string;
+  icon?: string;
+}
+
+/** StackBuilder - saved stack */
+export interface SavedStack {
+  id: number;
+  stack_name: string;
+  description?: string;
+  config_json: Record<string, unknown>;
+  global_settings?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** StackBuilder - integration detection result */
+export interface IntegrationDetectionResult {
+  integrations: Array<{
+    source: string;
+    target: string;
+    type: string;
+    auto_configured: boolean;
+    [key: string]: unknown;
+  }>;
+  suggestions: string[];
+}
+
+/** Playbook export data */
+export interface PlaybookExportData {
+  name: string;
+  path: string;
+  version: string;
+  description: string;
+  domain: string;
+  yaml_content: string;
+  metadata: PlaybookMetadata;
+}
+
+/** Playbook metadata (for import/export) */
+export interface PlaybookMetadata {
+  author?: string;
+  category?: string;
+  tags?: string[];
+  verified?: boolean;
+  [key: string]: unknown;
+}
+
+/** Playbook import/create response */
+export interface PlaybookImportResponse {
+  status: string;
+  message: string;
+  path: string;
+  playbook: PlaybookInfo;
+}
+
+/** Debug context response */
+export interface DebugContextResponse {
+  execution_id: string;
+  current_step: string;
+  variables: Record<string, unknown>;
+  browser_state: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** StackBuilder config for generate/deploy */
+export interface StackBuilderConfig {
+  instances: Array<{
+    app_id: string;
+    instance_name: string;
+    config: Record<string, unknown>;
+  }>;
+  global_settings?: {
+    stack_name?: string;
+    timezone?: string;
+    restart_policy?: string;
+  };
+  integration_settings?: Record<string, unknown>;
+}
+
 const logger = createLogger('API');
 
 // API Base URL - supports both web and Electron modes
@@ -234,11 +378,11 @@ export const api = {
         }
       ),
     export: (path: string) =>
-      fetchJSON<{ name: string; path: string; version: string; description: string; domain: string; yaml_content: string; metadata: any }>(
+      fetchJSON<PlaybookExportData>(
         `/api/playbooks/${encodeURIComponent(path)}/export`
       ),
-    import: (name: string, domain: string, yamlContent: string, overwrite: boolean = false, metadata?: any) =>
-      fetchJSON<{ status: string; message: string; path: string; playbook: any }>(
+    import: (name: string, domain: string, yamlContent: string, overwrite: boolean = false, metadata?: PlaybookMetadata) =>
+      fetchJSON<PlaybookImportResponse>(
         '/api/playbooks/import',
         {
           method: 'POST',
@@ -252,7 +396,7 @@ export const api = {
         }
       ),
     create: (name: string, domain: string, yamlContent: string) =>
-      fetchJSON<{ status: string; message: string; path: string; playbook: any }>(
+      fetchJSON<PlaybookImportResponse>(
         '/api/playbooks/create',
         {
           method: 'POST',
@@ -346,7 +490,7 @@ export const api = {
       ),
 
     getDebugContext: (executionId: string) =>
-      fetchJSON<any>(`/api/executions/${executionId}/debug/context`),
+      fetchJSON<DebugContextResponse>(`/api/executions/${executionId}/debug/context`),
 
     getDebugDOM: (executionId: string) =>
       fetchJSON<{ html: string }>(`/api/executions/${executionId}/debug/dom`),
@@ -424,7 +568,7 @@ export const api = {
    * API Explorer
    */
   apiExplorer: {
-    listApiKeys: () => fetchJSON<any[]>('/api/explorer/api-keys'),
+    listApiKeys: () => fetchJSON<ApiKeyInfo[]>('/api/explorer/api-keys'),
 
     createApiKey: (data: {
       name: string;
@@ -432,7 +576,7 @@ export const api = {
       api_key: string;
       description?: string;
     }) =>
-      fetchJSON<any>('/api/explorer/api-keys', {
+      fetchJSON<ApiKeyInfo>('/api/explorer/api-keys', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -442,7 +586,7 @@ export const api = {
       api_key?: string;
       description?: string;
     }) =>
-      fetchJSON<any>(`/api/explorer/api-keys/${encodeURIComponent(name)}`, {
+      fetchJSON<ApiKeyInfo>(`/api/explorer/api-keys/${encodeURIComponent(name)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
@@ -458,7 +602,7 @@ export const api = {
       api_key_name?: string;
       api_key?: string;
     }) =>
-      fetchJSON<any>('/api/explorer/gateway-info', {
+      fetchJSON<GatewayInfoResponse>('/api/explorer/gateway-info', {
         method: 'POST',
         body: JSON.stringify(request),
       }),
@@ -468,7 +612,7 @@ export const api = {
       api_key_name?: string;
       api_key?: string;
     }) =>
-      fetchJSON<any>('/api/explorer/openapi', {
+      fetchJSON<OpenAPIResponse>('/api/explorer/openapi', {
         method: 'POST',
         body: JSON.stringify(request),
       }),
@@ -478,7 +622,7 @@ export const api = {
       api_key_name?: string;
       api_key?: string;
     }) =>
-      fetchJSON<any>(`/api/explorer/resources/${resourceType}`, {
+      fetchJSON<ResourceListResponse>(`/api/explorer/resources/${resourceType}`, {
         method: 'POST',
         body: JSON.stringify(request),
       }),
@@ -489,11 +633,11 @@ export const api = {
       path: string;
       headers?: Record<string, string>;
       query_params?: Record<string, string>;
-      body?: any;
+      body?: unknown;
       api_key_name?: string;
       api_key?: string;
     }) =>
-      fetchJSON<any>('/api/explorer/request', {
+      fetchJSON<ExplorerRequestResponse>('/api/explorer/request', {
         method: 'POST',
         body: JSON.stringify(request),
       }),
@@ -536,11 +680,11 @@ export const api = {
    * Stack Builder
    */
   stackBuilder: {
-    getCatalog: () => fetchJSON<any>('/api/stackbuilder/catalog'),
+    getCatalog: () => fetchJSON<StackBuilderCatalog>('/api/stackbuilder/catalog'),
 
-    getApplications: () => fetchJSON<any[]>('/api/stackbuilder/catalog/applications'),
+    getApplications: () => fetchJSON<StackBuilderApplication[]>('/api/stackbuilder/catalog/applications'),
 
-    getCategories: () => fetchJSON<any[]>('/api/stackbuilder/catalog/categories'),
+    getCategories: () => fetchJSON<StackBuilderCategory[]>('/api/stackbuilder/catalog/categories'),
 
     getVersions: (appId: string) =>
       fetchJSON<{ versions: string[] }>(`/api/stackbuilder/versions/${encodeURIComponent(appId)}`),
@@ -557,7 +701,7 @@ export const api = {
         restart_policy?: string;
       };
     }) =>
-      fetchJSON<any>('/api/stackbuilder/detect-integrations', {
+      fetchJSON<IntegrationDetectionResult>('/api/stackbuilder/detect-integrations', {
         method: 'POST',
         body: JSON.stringify(config),
       }),
@@ -573,7 +717,7 @@ export const api = {
         timezone?: string;
         restart_policy?: string;
       };
-      integration_settings?: Record<string, any>;
+      integration_settings?: Record<string, unknown>;
     }) =>
       fetchJSON<{
         docker_compose: string;
@@ -596,7 +740,7 @@ export const api = {
         timezone?: string;
         restart_policy?: string;
       };
-      integration_settings?: Record<string, any>;
+      integration_settings?: Record<string, unknown>;
     }) => {
       const response = await fetch(`${API_BASE_URL}/api/stackbuilder/download`, {
         method: 'POST',
@@ -619,17 +763,17 @@ export const api = {
       a.remove();
     },
 
-    listStacks: () => fetchJSON<any[]>('/api/stackbuilder/stacks'),
+    listStacks: () => fetchJSON<SavedStack[]>('/api/stackbuilder/stacks'),
 
-    getStack: (id: number) => fetchJSON<any>(`/api/stackbuilder/stacks/${id}`),
+    getStack: (id: number) => fetchJSON<SavedStack>(`/api/stackbuilder/stacks/${id}`),
 
     saveStack: (data: {
       stack_name: string;
       description?: string;
-      config_json: Record<string, any>;
-      global_settings?: Record<string, any>;
+      config_json: Record<string, unknown>;
+      global_settings?: Record<string, unknown>;
     }) =>
-      fetchJSON<any>('/api/stackbuilder/stacks', {
+      fetchJSON<SavedStack>('/api/stackbuilder/stacks', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -637,10 +781,10 @@ export const api = {
     updateStack: (id: number, data: {
       stack_name: string;
       description?: string;
-      config_json: Record<string, any>;
-      global_settings?: Record<string, any>;
+      config_json: Record<string, unknown>;
+      global_settings?: Record<string, unknown>;
     }) =>
-      fetchJSON<any>(`/api/stackbuilder/stacks/${id}`, {
+      fetchJSON<SavedStack>(`/api/stackbuilder/stacks/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
@@ -666,7 +810,7 @@ export const api = {
         timezone?: string;
         restart_policy?: string;
       };
-      integration_settings?: Record<string, any>;
+      integration_settings?: Record<string, unknown>;
     }) =>
       fetchJSON<{ success: boolean; output?: string; error?: string }>('/api/stackbuilder/deploy', {
         method: 'POST',

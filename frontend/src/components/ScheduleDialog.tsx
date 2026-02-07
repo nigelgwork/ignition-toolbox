@@ -15,6 +15,8 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   Alert,
+  Snackbar,
+  Alert as MuiAlert,
 } from '@mui/material';
 import type { PlaybookInfo } from '../types/api';
 import { HelpTooltip } from './HelpTooltip';
@@ -49,6 +51,7 @@ export default function ScheduleDialog({
 }: ScheduleDialogProps) {
   const [scheduleName, setScheduleName] = useState('');
   const [scheduleType, setScheduleType] = useState<ScheduleType>('daily');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Interval settings
   const [intervalMinutes, setIntervalMinutes] = useState(60);
@@ -165,7 +168,7 @@ export default function ScheduleDialog({
       onClose();
     } catch (error) {
       logger.error('Failed to create schedule:', error);
-      alert(`Failed to create schedule: ${error}`);
+      setErrorMessage(`Failed to create schedule: ${error}`);
     }
   };
 
@@ -360,6 +363,17 @@ export default function ScheduleDialog({
           Create Schedule
         </Button>
       </DialogActions>
+
+      <Snackbar
+        open={!!errorMessage}
+        autoHideDuration={6000}
+        onClose={() => setErrorMessage(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <MuiAlert onClose={() => setErrorMessage(null)} severity="error" variant="filled" sx={{ width: '100%' }}>
+          {errorMessage}
+        </MuiAlert>
+      </Snackbar>
     </Dialog>
   );
 }

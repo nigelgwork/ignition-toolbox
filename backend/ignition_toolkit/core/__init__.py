@@ -8,6 +8,20 @@ Provides foundational components used across the toolkit:
 - Shared models
 """
 
-from ignition_toolkit.core.config import Settings, get_settings
+from ignition_toolkit.core.config import (
+    Settings,
+    get_settings,
+    get_toolkit_data_dir,
+    migrate_credentials_if_needed,
+    setup_environment,
+    is_dev_mode,
+)
 
-__all__ = ["Settings", "get_settings"]
+__all__ = [
+    "Settings",
+    "get_settings",
+    "get_toolkit_data_dir",
+    "migrate_credentials_if_needed",
+    "setup_environment",
+    "is_dev_mode",
+]

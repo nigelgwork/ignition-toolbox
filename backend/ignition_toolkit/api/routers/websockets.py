@@ -72,11 +72,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
     # Simple authentication: check for API key in query params
     api_key = websocket.query_params.get("api_key")
-    expected_key = os.getenv("WEBSOCKET_API_KEY", "dev-key-change-in-production")
-
-    # SECURITY: Warn if using default key (development only)
-    if expected_key == "dev-key-change-in-production":
-        logger.warning("Using default WebSocket API key - set WEBSOCKET_API_KEY in production!")
+    from ignition_toolkit.core.config import get_settings
+    expected_key = get_settings().websocket_api_key
 
     # SECURITY: Use constant-time comparison to prevent timing attacks
     if not api_key or not hmac.compare_digest(api_key, expected_key):
@@ -443,6 +440,18 @@ async def shell_terminal(websocket: WebSocket):
 
     Note: This feature requires Unix PTY support and is not available on Windows.
     """
+    import hmac
+
+    # Authenticate: check for API key in query params
+    api_key = websocket.query_params.get("api_key")
+    from ignition_toolkit.core.config import get_settings
+    expected_key = get_settings().websocket_api_key
+
+    if not api_key or not hmac.compare_digest(api_key, expected_key):
+        logger.warning(f"Unauthorized shell WebSocket connection attempt from {websocket.client}")
+        await websocket.close(code=1008, reason="Unauthorized")
+        return
+
     # Get working directory from query params
     working_dir = websocket.query_params.get("path", str(get_playbooks_dir().resolve()))
 

@@ -2,7 +2,7 @@
 
 **Project:** Ignition Toolbox
 **Last Updated:** 2026-02-06
-**Version:** 1.5.0
+**Version:** 1.5.3
 
 This document provides comprehensive architecture documentation including system design, component interactions, data flow, and key architectural decisions (ADRs).
 
@@ -96,7 +96,7 @@ The main process spawns the Python backend as a child process and communicates w
 │              Backend (Python 3.10+ / FastAPI)                    │
 │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐   │
 │  │   API Layer    │  │ Execution      │  │   Browser      │   │
-│  │  (6 Routers)   │  │   Engine       │  │   Manager      │   │
+│  │  (19 Routers)  │  │   Engine       │  │   Manager      │   │
 │  └────────────────┘  └────────────────┘  └────────────────┘   │
 │         │                    │                    │             │
 │         │           ┌────────┼────────┐           │             │
@@ -203,14 +203,16 @@ frontend/src/
 ├── components/               # Reusable UI components
 │   ├── PlaybookCard.tsx      # Playbook display card
 │   ├── ExecutionStepper.tsx  # Step-by-step progress
-│   ├── BrowserView.tsx       # Live browser feed (2 FPS)
+│   ├── LiveBrowserView.tsx   # Live browser feed (2 FPS)
 │   ├── ParameterInput.tsx    # Dynamic parameter forms
-│   └── CredentialForm.tsx    # Credential creation
+│   ├── AddCredentialDialog.tsx  # Credential creation
+│   └── EditCredentialDialog.tsx # Credential editing
 │
 ├── hooks/                    # Custom React hooks
 │   ├── useWebSocket.ts       # WebSocket connection + events
-│   ├── useExecution.ts       # Execution state management
-│   └── usePlaybooks.ts       # Playbook data fetching
+│   ├── usePlaybookOrder.ts   # Playbook ordering
+│   ├── useClaudeCode.ts      # Claude Code integration
+│   └── useDensity.ts         # UI density settings
 │
 ├── store/                    # Zustand global state
 │   └── store.ts              # Theme, app-wide state
@@ -246,10 +248,10 @@ ignition_toolkit/
 │
 ├── playbook/                 # Playbook execution engine
 │   ├── loader.py             # YAML parser + validation
-│   ├── resolver.py           # Parameter resolution ({{ parameter.x }})
-│   ├── executor.py           # Step execution coordinator
+│   ├── parameters.py        # Parameter resolution ({{ parameter.x }})
+│   ├── step_executor.py     # Step execution coordinator
 │   ├── engine.py             # Main execution engine
-│   └── state.py              # Pause/resume/skip state manager
+│   └── state_manager.py     # Pause/resume/skip state manager
 │
 ├── gateway/                  # Gateway REST API client
 │   ├── client.py             # Async httpx client
@@ -269,7 +271,7 @@ ignition_toolkit/
 │   └── models.py             # ORM models (ExecutionModel, StepResultModel)
 │
 ├── ai/                       # AI assistant (optional)
-│   ├── assistant.py          # Claude API integration
+│   ├── client.py            # Claude API integration
 │   └── prompts.py            # Prompt templates
 │
 ├── clouddesigner/            # CloudDesigner
@@ -321,7 +323,7 @@ The playbook execution engine is the core of the system:
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                 Parameter Resolver (resolver.py)                 │
+│                 Parameter Resolver (parameters.py)                 │
 │  • Resolve {{ parameter.X }}                                     │
 │  • Resolve {{ credential.Y.password }}                           │
 │  • Substitute environment variables                              │
@@ -465,7 +467,7 @@ WebSocket broadcast: "browser_frame" event
 Frontend receives WebSocket event
          │
          ▼
-BrowserView component updates <img> src
+LiveBrowserView component updates <img> src
          │
          ▼
 User sees live browser feed (2 FPS)
@@ -583,21 +585,22 @@ class ExecutionRequest(BaseModel):
         return v
 ```
 
-#### 4. API Authentication (Future)
+#### 4. API Authentication
 
-Currently, the API has no authentication (single-user local tool). For production deployment:
+API key authentication is implemented via the `auth/` module:
 
 ```python
-# Future: Add API key authentication
-from fastapi import Security, HTTPException
-from fastapi.security.api_key import APIKeyHeader
+# API key authentication (implemented in Phase 6)
+from ignition_toolkit.auth.api_keys import APIKeyManager
+from ignition_toolkit.auth.middleware import require_auth, require_permission
 
-api_key_header = APIKeyHeader(name="X-API-Key")
+# Keys are prefixed with "itk_" and stored as SHA-256 hashes
+# Supports expiration, rate limiting, and RBAC
+# Predefined roles: admin, user, readonly, executor
 
-async def verify_api_key(api_key: str = Security(api_key_header)):
-    if api_key != os.getenv("API_KEY"):
-        raise HTTPException(status_code=403, detail="Invalid API key")
-    return api_key
+@router.get("/api/protected")
+async def protected_endpoint(user=Depends(require_auth)):
+    return {"user": user.user_id}
 ```
 
 #### 5. WebSocket Security
@@ -1316,7 +1319,7 @@ The FastAPI application grew to 2,377 lines in a single `app.py` file, making it
    app.include_router(health_router)
    app.include_router(playbooks_router)
    app.include_router(executions_router)
-   # ... etc
+   # ... 19 routers total
    ```
 
 ### Architecture
@@ -1327,16 +1330,33 @@ The FastAPI application grew to 2,377 lines in a single `app.py` file, making it
 ignition_toolkit/api/
 ├── app.py                   # 190 lines (92% reduction from 2,377)
 │   ├── FastAPI initialization
-│   ├── Router registration (6 routers)
+│   ├── Router registration (19 routers)
 │   └── Frontend serving
 └── routers/
     ├── health.py            # Health check endpoints
-    ├── playbooks.py         # 6 routes (list, get, update, verify, delete)
-    ├── executions.py        # 11 routes (start, pause, resume, skip, cancel, etc.)
-    ├── credentials.py       # 4 routes (CRUD operations)
-    ├── ai.py                # 8 routes (AI credentials, settings, assist)
-    ├── websockets.py        # 2 WebSocket endpoints + broadcast helpers
-    └── models.py            # 7 shared Pydantic models
+    ├── config.py            # Configuration endpoints
+    ├── step_types.py        # Step type registry
+    ├── playbooks.py         # Playbook CRUD operations
+    ├── playbook_crud.py     # Playbook create/update/delete
+    ├── playbook_library.py  # Playbook library browsing
+    ├── playbook_lifecycle.py # Playbook install/uninstall
+    ├── playbook_metadata.py # Playbook metadata management
+    ├── executions/          # Execution control + monitoring
+    ├── credentials.py       # Credential CRUD operations
+    ├── schedules.py         # Scheduled execution management
+    ├── filesystem.py        # File browser endpoints
+    ├── updates.py           # Playbook update checking
+    ├── api_explorer.py      # Interactive API explorer
+    ├── stackbuilder/        # Stack Builder endpoints
+    ├── clouddesigner.py     # Cloud Designer endpoints
+    ├── context.py           # Execution context endpoints
+    ├── clawdbot.py          # AI assistant endpoints
+    ├── websockets.py        # WebSocket endpoints + broadcast
+    ├── logs.py              # Log streaming endpoints
+    ├── execution_queue.py   # Execution queue management
+    ├── auth.py              # API key authentication + RBAC
+    ├── reports.py           # Reporting + analytics
+    └── models.py            # Shared Pydantic models
 ```
 
 **Refactoring Journey:**

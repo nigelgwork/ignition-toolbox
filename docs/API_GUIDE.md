@@ -9,7 +9,35 @@ This guide documents the REST API and WebSocket endpoints for the Ignition Toolb
 
 ## Authentication
 
-Currently, the API does not require authentication for HTTP endpoints. WebSocket connections require an API key.
+The API supports API key authentication for multi-user deployments (implemented in Phase 6).
+
+### API Key Authentication
+
+Include the API key in the `X-API-Key` header:
+
+```http
+GET /api/playbooks
+X-API-Key: itk_your_api_key_here
+```
+
+### Key Features
+
+- Keys are prefixed with `itk_` for identification
+- Stored as SHA-256 hashes (never in plaintext)
+- Support expiration dates and rate limiting
+- Role-based access control (RBAC) with predefined roles: `admin`, `user`, `readonly`, `executor`
+
+### Default Behavior
+
+When running as a local single-user desktop app (Electron), authentication is not enforced by default. API key authentication is primarily intended for shared or headless deployments.
+
+### WebSocket Authentication
+
+WebSocket connections require an API key as a query parameter:
+
+```
+ws://localhost:5000/ws/executions?api_key=itk_your_api_key_here
+```
 
 ## REST API Endpoints
 
@@ -279,7 +307,7 @@ GET /api/health
 ```json
 {
   "status": "healthy",
-  "version": "1.5.0",
+  "version": "1.5.3",
   "uptime_seconds": 3600
 }
 ```
@@ -434,4 +462,4 @@ setInterval(() => {
 ---
 
 **Last Updated**: 2026-02-06
-**API Version**: 1.5.0
+**API Version**: 1.5.3

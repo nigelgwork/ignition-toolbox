@@ -28,6 +28,8 @@ import {
   IconButton,
   Tooltip,
   Chip,
+  Snackbar,
+  Alert as MuiAlert,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -81,6 +83,7 @@ interface PlaybookUpdatesDialogProps {
 export function PlaybookUpdatesDialog({ open, onClose }: PlaybookUpdatesDialogProps) {
   const [selectedDomain, setSelectedDomain] = useState<string>('all');
   const [updating, setUpdating] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch available updates
@@ -117,7 +120,7 @@ export function PlaybookUpdatesDialog({ open, onClose }: PlaybookUpdatesDialogPr
     onError: (error: Error) => {
       logger.error('Update failed:', error);
       setUpdating(null);
-      alert(`Update failed: ${error.message}`);
+      setErrorMessage(`Update failed: ${error.message}`);
     },
   });
 
@@ -342,6 +345,17 @@ export function PlaybookUpdatesDialog({ open, onClose }: PlaybookUpdatesDialogPr
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
+
+      <Snackbar
+        open={!!errorMessage}
+        autoHideDuration={6000}
+        onClose={() => setErrorMessage(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <MuiAlert onClose={() => setErrorMessage(null)} severity="error" variant="filled" sx={{ width: '100%' }}>
+          {errorMessage}
+        </MuiAlert>
+      </Snackbar>
     </Dialog>
   );
 }

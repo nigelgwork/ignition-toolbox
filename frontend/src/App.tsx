@@ -74,6 +74,56 @@ const themeColors = {
   },
 };
 
+/**
+ * Create MUI theme from the current theme mode.
+ * Shared by AppContent and ExecutionDetailWrapper to avoid duplication.
+ */
+function createAppTheme(themeMode: 'dark' | 'light') {
+  const colors = themeColors[themeMode];
+
+  return createTheme({
+    palette: {
+      mode: themeMode,
+      primary: {
+        main: colors.primary,
+        light: themeMode === 'dark' ? '#79c0ff' : '#54aeff',
+        dark: colors.secondary,
+      },
+      secondary: {
+        main: colors.secondary,
+      },
+      success: {
+        main: colors.success,
+      },
+      warning: {
+        main: colors.warning,
+      },
+      error: {
+        main: colors.error,
+      },
+      background: {
+        default: colors.background,
+        paper: colors.surface,
+      },
+      text: {
+        primary: colors.text,
+        secondary: colors.textSecondary,
+      },
+      divider: colors.border,
+    },
+    components: {
+      MuiCard: {
+        styleOverrides: {
+          root: {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        },
+      },
+    },
+  });
+}
+
 function AppContent() {
   const [activeTab, setActiveTab] = useState<DomainTab>('gateway');
   const setExecutionUpdate = useStore((state) => state.setExecutionUpdate);
@@ -81,51 +131,7 @@ function AppContent() {
   const themeMode = useStore((state) => state.theme);
 
   // Create theme based on current mode from store
-  const theme = useMemo(() => {
-    const colors = themeColors[themeMode];
-
-    return createTheme({
-      palette: {
-        mode: themeMode,
-        primary: {
-          main: colors.primary,
-          light: themeMode === 'dark' ? '#79c0ff' : '#54aeff',
-          dark: colors.secondary,
-        },
-        secondary: {
-          main: colors.secondary,
-        },
-        success: {
-          main: colors.success,
-        },
-        warning: {
-          main: colors.warning,
-        },
-        error: {
-          main: colors.error,
-        },
-        background: {
-          default: colors.background,
-          paper: colors.surface,
-        },
-        text: {
-          primary: colors.text,
-          secondary: colors.textSecondary,
-        },
-        divider: colors.border,
-      },
-      components: {
-        MuiCard: {
-          styleOverrides: {
-            root: {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-            },
-          },
-        },
-      },
-    });
-  }, [themeMode]);
+  const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
 
   // Connect to WebSocket for real-time updates (silent - no UI indicators)
   useWebSocket({
@@ -197,23 +203,8 @@ function ExecutionDetailWrapper() {
     onScreenshotFrame: (frame) => setScreenshotFrame(frame.executionId, frame),
   });
 
-  // Create theme
-  const theme = useMemo(() => {
-    const colors = themeColors[themeMode];
-    return createTheme({
-      palette: {
-        mode: themeMode,
-        primary: { main: colors.primary, light: themeMode === 'dark' ? '#79c0ff' : '#54aeff', dark: colors.secondary },
-        secondary: { main: colors.secondary },
-        success: { main: colors.success },
-        warning: { main: colors.warning },
-        error: { main: colors.error },
-        background: { default: colors.background, paper: colors.surface },
-        text: { primary: colors.text, secondary: colors.textSecondary },
-        divider: colors.border,
-      },
-    });
-  }, [themeMode]);
+  // Create theme (shared with AppContent via createAppTheme)
+  const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
 
   // Handle tab change - navigate back to main app
   const handleTabChange = (tab: DomainTab) => {

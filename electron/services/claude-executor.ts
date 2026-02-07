@@ -1,6 +1,4 @@
 import { spawn, ChildProcess } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
 
 /**
  * Result from Claude CLI execution
@@ -76,8 +74,7 @@ export class ClaudeExecutor {
       const fullPrompt = systemPrompt ? `${systemPrompt}\n\nUser: ${prompt}` : prompt;
 
       // Spawn claude CLI with --print flag for non-interactive output
-      // Use --dangerously-skip-permissions to avoid permission prompts
-      const args = ['--print', '--output-format', 'text', '--dangerously-skip-permissions'];
+      const args = ['--print', '--output-format', 'text'];
 
       this.activeProcess = spawn('claude', args, {
         shell: true,

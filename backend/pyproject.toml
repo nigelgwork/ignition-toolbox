@@ -67,10 +67,10 @@ designer = [
 ignition-toolkit = "ignition_toolkit.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/nigelgwork/ignition-playground"
-Documentation = "https://github.com/nigelgwork/ignition-playground/docs"
-Repository = "https://github.com/nigelgwork/ignition-playground"
-Issues = "https://github.com/nigelgwork/ignition-playground/issues"
+Homepage = "https://github.com/nigelgwork/ignition-toolbox"
+Documentation = "https://github.com/nigelgwork/ignition-toolbox/docs"
+Repository = "https://github.com/nigelgwork/ignition-toolbox"
+Issues = "https://github.com/nigelgwork/ignition-toolbox/issues"
 
 [tool.setuptools]
 packages = ["ignition_toolkit"]

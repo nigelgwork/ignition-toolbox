@@ -930,7 +930,7 @@ Before marking a playbook as complete:
 ## Related Documentation
 
 - **playbook_syntax.md** - Complete syntax reference
-- **RUNNING_PLAYBOOKS.md** - How to execute playbooks
+- **API_GUIDE.md** - REST API and execution endpoints
 - **ARCHITECTURE.md** - Technical architecture and execution engine
 - **PROJECT_GOALS.md** - Project vision and use cases
 

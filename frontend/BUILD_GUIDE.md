@@ -33,14 +33,14 @@ This removes the `dist` directory before building, ensuring no stale files.
 From the project root, use:
 
 ```bash
-./rebuild-frontend.sh   # One-command rebuild from anywhere
+npm run rebuild          # Clean rebuild from frontend dir
 ```
 
 ## When to Use Each Command
 
 - **Regular development**: `npm run build` (automatic verification)
 - **After making changes**: `npm run rebuild` (clean build)
-- **From project root**: `./rebuild-frontend.sh` (convenience script)
+- **From project root**: `cd frontend && npm run rebuild` (clean build)
 - **Just verify current build**: `npm run verify`
 
 ## What Gets Verified

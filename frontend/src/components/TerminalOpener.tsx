@@ -59,8 +59,12 @@ export function TerminalOpener({
   }, []);
 
   const handleOpenTerminal = () => {
-    // For now, just provide instructions since direct terminal opening requires system integration
-    alert(`Terminal Opening Instructions:\n\n1. Open your terminal application\n2. Run: cd ${playbooksPath}\n3. Run: claude-code\n4. Refer to CLAUDE_CODE_INSTRUCTIONS.md for context`);
+    // Copy the command to clipboard for convenience
+    const command = `cd ${playbooksPath} && claude-code`;
+    navigator.clipboard.writeText(command).catch(() => {
+      // Fallback: just log
+      logger.info('Terminal command:', command);
+    });
   };
 
   return (

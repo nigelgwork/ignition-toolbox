@@ -121,7 +121,3 @@ websockets==15.0.1
     # via
     #   ignition-toolkit (pyproject.toml)
     #   uvicorn
-
-# Build dependencies
-pyinstaller==6.11.1
-    # for building standalone executable

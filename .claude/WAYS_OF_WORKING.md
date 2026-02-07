@@ -360,7 +360,7 @@ Saved.
 - [ ] Documentation up to date
 - [ ] Security audit passed
 - [ ] Example playbooks tested
-- [ ] VERSION.md updated
+- [ ] package.json + frontend/package.json version updated
 - [ ] Git tag created
 - [ ] README.md updated
 

@@ -253,14 +253,14 @@
 
 ### 4.2 Visual Testing (~40h)
 
-- [x] **Screenshot Comparison** ✅ DONE (v1.4.75)
+- [x] **Screenshot Comparison** ❌ REMOVED (v1.5.2 - was implemented in v1.4.75, removed in v1.5.2)
   - visual_testing module with Pillow-based comparison
   - BaselineManager for CRUD operations
   - Pixel-diff algorithm with configurable threshold
   - browser.compare_screenshot step type
   - Effort: 20h
 
-- [x] **Baseline Management UI** ✅ DONE (v1.4.75)
+- [x] **Baseline Management UI** ❌ REMOVED (v1.5.2 - was implemented in v1.4.75, removed in v1.5.2)
   - Baselines page with grid view
   - API endpoints for baseline CRUD
   - Approve/reject workflow

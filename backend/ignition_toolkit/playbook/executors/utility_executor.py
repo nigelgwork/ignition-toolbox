@@ -114,10 +114,11 @@ class UtilityPythonHandler(StepHandler):
 
             try:
                 # Create restricted builtins (v4 security)
+                import builtins
                 safe_builtins = {
-                    name: getattr(__builtins__, name)
+                    name: getattr(builtins, name)
                     for name in self.SAFE_BUILTINS
-                    if hasattr(__builtins__, name)
+                    if hasattr(builtins, name)
                 }
 
                 # Get variable storage from parameter resolver
@@ -134,17 +135,13 @@ class UtilityPythonHandler(StepHandler):
                     """Retrieve a previously stored variable"""
                     return variables_dict.get(name, default)
 
-                # Create execution environment with access to common libraries
-                # NOTE: v3.45.7 compatibility - Designer playbooks need os/subprocess
+                # Create execution environment with safe libraries only
                 exec_globals = {
-                    "__builtins__": __builtins__,
+                    "__builtins__": safe_builtins,
                     "Path": __import__("pathlib").Path,
                     "zipfile": __import__("zipfile"),
                     "ET": __import__("xml.etree.ElementTree"),
                     "json": __import__("json"),
-                    "os": __import__("os"),
-                    "subprocess": __import__("subprocess"),
-                    "asyncio": __import__("asyncio"),
                     "time": __import__("time"),
                     "set_variable": set_variable,
                     "get_variable": get_variable,

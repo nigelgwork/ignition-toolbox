@@ -52,7 +52,7 @@ jobs:
         run: |
           cd backend
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install -r requirements-build.txt
 
       - name: Install Playwright browsers to bundle directory
         run: |

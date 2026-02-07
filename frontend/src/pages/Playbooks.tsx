@@ -14,16 +14,9 @@ import {
   Button,
   IconButton,
   Tooltip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Badge,
+  Snackbar,
+  Alert as MuiAlert,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -35,7 +28,7 @@ import {
   SystemUpdate as UpdateIcon,
   RestartAlt as ResetIcon,
 } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DndContext,
   closestCenter,
@@ -64,9 +57,20 @@ import { PlaybookStepsDialog } from '../components/PlaybookStepsDialog';
 import { PlaybookLibraryDialog } from '../components/PlaybookLibraryDialog';
 import { PlaybookUpdatesDialog } from '../components/PlaybookUpdatesDialog';
 import { PlaybookEditorDialog } from '../components/PlaybookEditorDialog';
+import { CreatePlaybookDialog } from '../components/CreatePlaybookDialog';
 import { useStore } from '../store';
 import { useDensity } from '../hooks/useDensity';
+import { useCategoryOrder, useCategoryExpanded, useGroupExpanded } from '../hooks/usePlaybookOrder';
 import type { PlaybookInfo } from '../types/api';
+
+// Extracted modules
+import { categorizePlaybooks, groupPlaybooks, domainNames } from './PlaybookCategorySection';
+import { createCategoryDragEndHandler } from './PlaybookDragHandlers';
+import {
+  handleExport as doExport,
+  handleImport as doImport,
+  handleResetMetadata as doResetMetadata,
+} from './PlaybookImportExport';
 
 // Sortable playbook card wrapper
 function SortablePlaybookCard({ playbook, onConfigure, onExecute, onExport, onViewSteps, onEditPlaybook, dragEnabled }: {
@@ -174,138 +178,10 @@ function SortableAccordion({
   );
 }
 
-// Load custom order from localStorage
-function getPlaybookOrder(category: string): string[] {
-  const stored = localStorage.getItem(`playbook_order_${category}`);
-  return stored ? JSON.parse(stored) : [];
-}
-
-// Save custom order to localStorage
-function savePlaybookOrder(category: string, order: string[]) {
-  localStorage.setItem(`playbook_order_${category}`, JSON.stringify(order));
-}
-
-// Load category order from localStorage
-function getCategoryOrder(): string[] {
-  const stored = localStorage.getItem('category_order');
-  return stored ? JSON.parse(stored) : ['gateway', 'designer', 'perspective'];
-}
-
-// Save category order to localStorage
-function saveCategoryOrder(order: string[]) {
-  localStorage.setItem('category_order', JSON.stringify(order));
-}
-
-// Load category expanded state from localStorage
-function getCategoryExpandedState(): Record<string, boolean> {
-  const stored = localStorage.getItem('category_expanded');
-  return stored ? JSON.parse(stored) : { gateway: true, designer: true, perspective: true };
-}
-
-// Save category expanded state to localStorage
-function saveCategoryExpandedState(state: Record<string, boolean>) {
-  localStorage.setItem('category_expanded', JSON.stringify(state));
-}
-
-// Load group expanded state from localStorage
-function getGroupExpandedState(): Record<string, boolean> {
-  const stored = localStorage.getItem('group_expanded');
-  return stored ? JSON.parse(stored) : {};
-}
-
-// Save group expanded state to localStorage
-function saveGroupExpandedState(state: Record<string, boolean>) {
-  localStorage.setItem('group_expanded', JSON.stringify(state));
-}
-
-// Apply saved order to playbooks
-function applyOrder(playbooks: PlaybookInfo[], category: string): PlaybookInfo[] {
-  const savedOrder = getPlaybookOrder(category);
-  if (savedOrder.length === 0) return playbooks;
-
-  // Create a map for quick lookup
-  const playbookMap = new Map(playbooks.map(p => [p.path, p]));
-
-  // First, add playbooks in saved order
-  const ordered: PlaybookInfo[] = [];
-  savedOrder.forEach(path => {
-    const playbook = playbookMap.get(path);
-    if (playbook) {
-      ordered.push(playbook);
-      playbookMap.delete(path);
-    }
-  });
-
-  // Then add any new playbooks that weren't in the saved order
-  playbookMap.forEach(playbook => ordered.push(playbook));
-
-  return ordered;
-}
-
-// Categorize playbooks by domain field (preferred) or path (fallback)
-function categorizePlaybooks(playbooks: PlaybookInfo[]) {
-  const gateway: PlaybookInfo[] = [];
-  const designer: PlaybookInfo[] = [];
-  const perspective: PlaybookInfo[] = [];
-
-  playbooks.forEach((playbook) => {
-    // Prefer domain field from YAML metadata
-    if (playbook.domain) {
-      if (playbook.domain === 'gateway') {
-        gateway.push(playbook);
-      } else if (playbook.domain === 'designer') {
-        designer.push(playbook);
-      } else if (playbook.domain === 'perspective') {
-        perspective.push(playbook);
-      } else {
-        // Unknown domain, fall back to path
-        categorizeByPath(playbook);
-      }
-    } else {
-      // No domain field, fall back to path
-      categorizeByPath(playbook);
-    }
-
-    function categorizeByPath(pb: PlaybookInfo) {
-      if (pb.path.includes('gateway/')) {
-        gateway.push(pb);
-      } else if (pb.path.includes('designer/')) {
-        designer.push(pb);
-      } else if (pb.path.includes('perspective/') || pb.path.includes('browser/')) {
-        perspective.push(pb);
-      } else {
-        // Default to gateway if unclear
-        gateway.push(pb);
-      }
-    }
-  });
-
-  // Apply saved order to each category
-  return {
-    gateway: applyOrder(gateway, 'gateway'),
-    designer: applyOrder(designer, 'designer'),
-    perspective: applyOrder(perspective, 'perspective'),
-  };
-}
-
-// Group playbooks by their group field
-function groupPlaybooks(playbooks: PlaybookInfo[]) {
-  const grouped: Record<string, PlaybookInfo[]> = {};
-  const ungrouped: PlaybookInfo[] = [];
-
-  playbooks.forEach(playbook => {
-    if (playbook.group) {
-      if (!grouped[playbook.group]) {
-        grouped[playbook.group] = [];
-      }
-      grouped[playbook.group].push(playbook);
-    } else {
-      ungrouped.push(playbook);
-    }
-  });
-
-  return { grouped, ungrouped };
-}
+// Inline utility functions (getPlaybookOrder, savePlaybookOrder, applyOrder,
+// categorizePlaybooks, groupPlaybooks) have been extracted to:
+// - PlaybookDragHandlers.ts
+// - PlaybookCategorySection.tsx
 
 interface PlaybooksProps {
   domainFilter?: 'gateway' | 'designer' | 'perspective';
@@ -313,8 +189,20 @@ interface PlaybooksProps {
 
 export function Playbooks({ domainFilter }: PlaybooksProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { gap, gridSpacing } = useDensity();
   const playbookGridColumns = useStore((state) => state.playbookGridColumns);
+
+  // Snackbar notification state
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>({ open: false, message: '', severity: 'info' });
+
+  const showNotification = (message: string, severity: 'success' | 'error' | 'warning' | 'info') => {
+    setSnackbar({ open: true, message, severity });
+  };
 
   // Generate responsive grid columns based on max setting
   const getGridColumns = (forCategory = false) => {
@@ -332,16 +220,14 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
   const [stepsDialogPlaybook, setStepsDialogPlaybook] = useState<PlaybookInfo | null>(null);
   const [editorPlaybook, setEditorPlaybook] = useState<PlaybookInfo | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(getGroupExpandedState());
+  const { expanded: expandedGroups, setExpanded: setGroupExpanded, toggleExpanded: toggleGroupExpanded } = useGroupExpanded();
   const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
   const [updatesDialogOpen, setUpdatesDialogOpen] = useState(false);
-  const [newPlaybookName, setNewPlaybookName] = useState('');
-  const [newPlaybookDescription, setNewPlaybookDescription] = useState('');
-  const [newPlaybookDomain, setNewPlaybookDomain] = useState<'gateway' | 'perspective' | 'designer'>(domainFilter || 'gateway');
 
-  // Category order and expanded state
-  const [categoryOrder, setCategoryOrder] = useState<string[]>(getCategoryOrder());
-  const [categoryExpanded, setCategoryExpanded] = useState<Record<string, boolean>>(getCategoryExpandedState());
+  // Category order and expanded state (managed by hooks with localStorage persistence)
+  const { order: rawCategoryOrder, updateOrder: updateCategoryOrder } = useCategoryOrder();
+  const categoryOrder = rawCategoryOrder.length > 0 ? rawCategoryOrder : ['gateway', 'designer', 'perspective'];
+  const { expanded: categoryExpanded, setExpanded: setCategoryExpanded } = useCategoryExpanded();
 
   // Fetch playbooks
   const { data: playbooks = [], isLoading, error } = useQuery<PlaybookInfo[]>({
@@ -457,9 +343,9 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
         logger.error('Failed to execute playbook:', error);
         logger.error('Error details:', error instanceof Error ? error.message : String(error));
         if (error && typeof error === 'object' && 'data' in error) {
-          logger.error('Error data:', (error as any).data);
+          logger.error('Error data:', (error as { data: unknown }).data);
         }
-        alert(`Failed to start execution: ${error instanceof Error ? error.message : String(error)}\n\nCheck console for details.`);
+        showNotification(`Failed to start execution: ${error instanceof Error ? error.message : String(error)}`, 'error');
       });
 
       // Return immediately without waiting - navigation will happen when API responds
@@ -482,7 +368,7 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
       const savedConfig = JSON.parse(savedConfigStr);
 
       // Convert boolean string values to actual booleans
-      const convertedParams: Record<string, any> = {};
+      const convertedParams: Record<string, string | boolean> = {};
       for (const [key, value] of Object.entries(savedConfig.parameters || {})) {
         // Find the parameter definition
         const paramDef = playbook.parameters.find(p => p.name === key);
@@ -490,14 +376,14 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
           // Convert string 'true'/'false' to boolean
           convertedParams[key] = value === 'true' || value === true;
         } else {
-          convertedParams[key] = value;
+          convertedParams[key] = value as string;
         }
       }
 
       // Execute with saved config parameters + global credential (don't await - navigate when ready)
       api.executions.start({
         playbook_path: playbook.path,
-        parameters: convertedParams, // Use converted params (boolean types fixed)
+        parameters: convertedParams as Record<string, string>, // Use converted params (boolean types fixed)
         gateway_url: selectedCredential.gateway_url, // Always use global credential's gateway_url
         credential_name: selectedCredential.name, // Always use global credential
         debug_mode,
@@ -507,47 +393,18 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
         navigate(`/executions/${response.execution_id}`);
       }).catch(error => {
         logger.error('Failed to execute playbook:', error);
-        alert('Failed to start execution. Please check the console for details.');
+        showNotification('Failed to start execution. Please check the console for details.', 'error');
       });
     } catch (error) {
       logger.error('Failed to parse saved config:', error);
-      alert('Failed to load saved configuration. Please try again.');
+      showNotification('Failed to load saved configuration. Please try again.', 'error');
     }
   };
 
-  // Drag end handlers for each category
-  const handleGatewayDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = gatewayPlaybooks.findIndex(p => p.path === active.id);
-      const newIndex = gatewayPlaybooks.findIndex(p => p.path === over.id);
-      const newOrder = arrayMove(gatewayPlaybooks, oldIndex, newIndex);
-      setGatewayPlaybooks(newOrder);
-      savePlaybookOrder('gateway', newOrder.map(p => p.path));
-    }
-  };
-
-  const handleDesignerDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = designerPlaybooks.findIndex(p => p.path === active.id);
-      const newIndex = designerPlaybooks.findIndex(p => p.path === over.id);
-      const newOrder = arrayMove(designerPlaybooks, oldIndex, newIndex);
-      setDesignerPlaybooks(newOrder);
-      savePlaybookOrder('designer', newOrder.map(p => p.path));
-    }
-  };
-
-  const handlePerspectiveDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = perspectivePlaybooks.findIndex(p => p.path === active.id);
-      const newIndex = perspectivePlaybooks.findIndex(p => p.path === over.id);
-      const newOrder = arrayMove(perspectivePlaybooks, oldIndex, newIndex);
-      setPerspectivePlaybooks(newOrder);
-      savePlaybookOrder('perspective', newOrder.map(p => p.path));
-    }
-  };
+  // Unified drag end handlers using parameterized factory (replaces 3 identical handlers)
+  const handleGatewayDragEnd = createCategoryDragEndHandler(gatewayPlaybooks, setGatewayPlaybooks, 'gateway');
+  const handleDesignerDragEnd = createCategoryDragEndHandler(designerPlaybooks, setDesignerPlaybooks, 'designer');
+  const handlePerspectiveDragEnd = createCategoryDragEndHandler(perspectivePlaybooks, setPerspectivePlaybooks, 'perspective');
 
   // Handle category reordering
   const handleCategoryDragEnd = (event: DragEndEvent) => {
@@ -556,8 +413,7 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
       const oldIndex = categoryOrder.indexOf(active.id as string);
       const newIndex = categoryOrder.indexOf(over.id as string);
       const newOrder = arrayMove(categoryOrder, oldIndex, newIndex);
-      setCategoryOrder(newOrder);
-      saveCategoryOrder(newOrder);
+      updateCategoryOrder(newOrder);
     }
   };
 
@@ -566,12 +422,7 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
     _event: React.SyntheticEvent,
     isExpanded: boolean
   ) => {
-    const newExpandedState = {
-      ...categoryExpanded,
-      [categoryId]: isExpanded,
-    };
-    setCategoryExpanded(newExpandedState);
-    saveCategoryExpandedState(newExpandedState);
+    setCategoryExpanded(categoryId, isExpanded);
   };
 
   const handleViewSteps = (playbook: PlaybookInfo) => {
@@ -582,190 +433,22 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
     setEditorPlaybook(playbook);
   };
 
-  const handleExport = async (playbook: PlaybookInfo) => {
-    try {
-      // Fetch full playbook export with YAML content
-      const exportData = await api.playbooks.export(playbook.path);
-
-      // Create download link
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${playbook.name.replace(/\s+/g, '_')}_export.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      alert(`Failed to export playbook: ${(error as Error).message}`);
-    }
+  // Delegate to extracted modules (import/export/reset use snackbar + queryClient)
+  const handleExport = (playbook: PlaybookInfo) => {
+    doExport(playbook, showNotification);
   };
 
   const handleImport = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = async (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          try {
-            const data = JSON.parse(event.target?.result as string);
-
-            // Validate export format
-            if (!data.yaml_content || !data.name || !data.domain) {
-              alert('Invalid export file: missing required fields (yaml_content, name, domain)');
-              return;
-            }
-
-            // Security check: Warn about utility.python steps (potential code injection)
-            const hasUtilityPython = data.yaml_content.includes('type: utility.python');
-            if (hasUtilityPython) {
-              const securityWarning = window.confirm(
-                `⚠️ SECURITY WARNING ⚠️\n\n` +
-                `This playbook contains Python code execution steps (utility.python).\n\n` +
-                `Python steps can execute arbitrary code with full system access, including:\n` +
-                `• Reading/modifying files\n` +
-                `• Accessing credentials\n` +
-                `• Network operations\n` +
-                `• System commands\n\n` +
-                `Only import playbooks from trusted sources!\n\n` +
-                `Do you want to review the playbook code before importing?`
-              );
-
-              if (securityWarning) {
-                // Show YAML content for review
-                const reviewConfirm = window.confirm(
-                  `Playbook YAML Content:\n\n${data.yaml_content.substring(0, 1000)}...\n\n` +
-                  `(Full content shown in browser console)\n\n` +
-                  `Continue with import?`
-                );
-                logger.debug('=== PLAYBOOK CODE REVIEW ===');
-                logger.debug(data.yaml_content);
-                logger.debug('=== END PLAYBOOK CODE ===');
-
-                if (!reviewConfirm) return;
-              }
-            }
-
-            // Confirm import
-            const confirmImport = window.confirm(
-              `Import playbook "${data.name}"?\n\n` +
-              `Domain: ${data.domain}\n` +
-              `Version: ${data.version}\n\n` +
-              `This will create a new playbook in your playbooks/${data.domain}/ directory.`
-            );
-
-            if (!confirmImport) return;
-
-            // Import playbook (pass metadata to preserve verified status)
-            const result = await api.playbooks.import(
-              data.name,
-              data.domain,
-              data.yaml_content,
-              false, // Don't overwrite by default
-              data.metadata // Pass metadata to preserve verified status
-            );
-
-            alert(`Success! Playbook imported to:\n${result.path}\n\nRefreshing playbook list...`);
-
-            // Refresh playbook list
-            window.location.reload();
-          } catch (error) {
-            alert(`Failed to import playbook: ${(error as Error).message}`);
-          }
-        };
-        reader.readAsText(file);
-      }
-    };
-    input.click();
+    doImport(showNotification, queryClient);
   };
 
-  const handleResetMetadata = async () => {
-    const confirmed = window.confirm(
-      'Reset all playbook metadata?\n\n' +
-      'This will clear all verification states, enabled/disabled states, and other metadata for all playbooks.\n\n' +
-      'You will need to re-verify any playbooks that require verification.\n\n' +
-      'This is useful for troubleshooting path-related issues on Windows.'
-    );
-
-    if (!confirmed) return;
-
-    try {
-      await api.playbooks.resetMetadata();
-      alert('Playbook metadata has been reset.\n\nRefreshing...');
-      window.location.reload();
-    } catch (error) {
-      alert(`Failed to reset metadata: ${(error as Error).message}`);
-    }
+  const handleResetMetadata = () => {
+    doResetMetadata(showNotification, queryClient);
   };
 
-  const handleCreatePlaybook = async () => {
-    if (!newPlaybookName.trim()) {
-      alert('Please enter a playbook name');
-      return;
-    }
-
-    // Create basic playbook template
-    const yamlTemplate = `name: "${newPlaybookName}"
-version: "1.0"
-description: "${newPlaybookDescription || 'New playbook'}"
-domain: ${newPlaybookDomain}
-
-parameters:
-  - name: gateway_url
-    type: string
-    required: true
-    description: "Gateway URL (e.g., http://localhost:8088)"
-
-  - name: username
-    type: string
-    required: true
-    description: "Gateway admin username"
-
-  - name: password
-    type: string
-    required: true
-    description: "Gateway admin password"
-
-steps:
-  # Add your steps here
-  - id: step1
-    name: "Example Step"
-    type: utility.sleep
-    parameters:
-      seconds: 1
-    timeout: 10
-    on_failure: abort
-
-metadata:
-  author: "User"
-  category: "${newPlaybookDomain}"
-  tags: ["custom"]
-`;
-
-    try {
-      const result = await api.playbooks.create(
-        newPlaybookName,
-        newPlaybookDomain,
-        yamlTemplate
-      );
-
-      alert(`Success! Playbook created at:\n${result.path}\n\nRefreshing playbook list...`);
-
-      // Reset form
-      setNewPlaybookName('');
-      setNewPlaybookDescription('');
-      setNewPlaybookDomain('gateway');
-      setCreateDialogOpen(false);
-
-      // Refresh playbook list
-      window.location.reload();
-    } catch (error) {
-      alert(`Failed to create playbook: ${(error as Error).message}`);
-    }
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['playbooks'] });
+    queryClient.invalidateQueries({ queryKey: ['playbook-update-stats'] });
   };
 
   // Get filtered playbooks based on domainFilter prop
@@ -780,13 +463,6 @@ metadata:
   };
 
   const filteredPlaybooks = getFilteredPlaybooks();
-
-  // Domain display names
-  const domainNames: Record<string, string> = {
-    gateway: 'Gateway',
-    designer: 'Designer',
-    perspective: 'Perspective',
-  };
 
   return (
     <Box>
@@ -870,7 +546,7 @@ metadata:
 
           <Tooltip title="Refresh playbook list">
             <IconButton
-              onClick={() => window.location.reload()}
+              onClick={handleRefresh}
               size="small"
               color="primary"
             >
@@ -961,11 +637,7 @@ metadata:
                       expanded={dragEnabled || (expandedGroups[groupName] !== undefined ? expandedGroups[groupName] : false)}
                       onChange={() => {
                         if (!dragEnabled) {
-                          setExpandedGroups(prev => {
-                            const newState = { ...prev, [groupName]: prev[groupName] !== undefined ? !prev[groupName] : true };
-                            saveGroupExpandedState(newState);
-                            return newState;
-                          });
+                          toggleGroupExpanded(groupName);
                         }
                       }}
                       sx={{ bgcolor: 'background.paper', boxShadow: 1 }}
@@ -1088,14 +760,7 @@ metadata:
                                       expanded={dragEnabled || (expandedGroups[groupName] !== undefined ? expandedGroups[groupName] : false)}
                                       onChange={() => {
                                         if (!dragEnabled) {
-                                          setExpandedGroups(prev => {
-                                            const newState = {
-                                              ...prev,
-                                              [groupName]: prev[groupName] !== undefined ? !prev[groupName] : true
-                                            };
-                                            saveGroupExpandedState(newState);
-                                            return newState;
-                                          });
+                                          toggleGroupExpanded(groupName);
                                         }
                                       }}
                                       sx={{ bgcolor: 'background.paper', boxShadow: 1 }}
@@ -1191,65 +856,13 @@ metadata:
       />
 
       {/* Create New Playbook Dialog */}
-      <Dialog
+      <CreatePlaybookDialog
         open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Create New Playbook</DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="Playbook Name"
-              value={newPlaybookName}
-              onChange={(e) => setNewPlaybookName(e.target.value)}
-              fullWidth
-              required
-              variant="outlined"
-              helperText="Give your playbook a descriptive name"
-            />
-            <TextField
-              label="Description"
-              value={newPlaybookDescription}
-              onChange={(e) => setNewPlaybookDescription(e.target.value)}
-              fullWidth
-              multiline
-              rows={2}
-              variant="outlined"
-              helperText="Describe what this playbook does"
-            />
-            <FormControl fullWidth>
-              <InputLabel>Domain</InputLabel>
-              <Select
-                value={newPlaybookDomain}
-                onChange={(e) => setNewPlaybookDomain(e.target.value as 'gateway' | 'perspective' | 'designer')}
-                label="Domain"
-              >
-                <MenuItem value="gateway">Gateway</MenuItem>
-                <MenuItem value="perspective">Perspective</MenuItem>
-                <MenuItem value="designer">Designer</MenuItem>
-              </Select>
-            </FormControl>
-            <Alert severity="info">
-              A basic playbook template will be created with standard parameters and a sample step.
-              You can edit the YAML file after creation to add your own steps.
-            </Alert>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleCreatePlaybook}
-            variant="contained"
-            disabled={!newPlaybookName.trim()}
-          >
-            Create Playbook
-          </Button>
-        </DialogActions>
-      </Dialog>
+        defaultDomain={domainFilter || 'gateway'}
+        queryClient={queryClient}
+        showNotification={showNotification}
+      />
 
       {/* Playbook Library Dialog */}
       <PlaybookLibraryDialog
@@ -1272,6 +885,23 @@ metadata:
           // Optionally refresh the playbooks list
         }}
       />
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <MuiAlert
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
 
     </Box>
   );

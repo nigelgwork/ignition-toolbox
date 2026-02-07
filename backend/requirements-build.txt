@@ -1,0 +1,10 @@
+#
+# Build-only dependencies (not needed at runtime)
+# Install alongside requirements.txt when building the standalone executable
+#
+# Usage:
+#   pip install -r requirements.txt
+#   pip install -r requirements-build.txt
+#
+pyinstaller==6.11.1
+    # for building standalone executable

@@ -1,6 +1,7 @@
 import { ipcMain, dialog, shell, app, BrowserWindow } from 'electron';
-import { exec } from 'child_process';
 import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import { PythonBackend } from '../services/python-backend';
 import { getSetting, setSetting, getAllSettings } from '../services/settings';
 import {
@@ -11,43 +12,7 @@ import {
 } from '../services/auto-updater';
 import { getClaudeExecutor } from '../services/claude-executor';
 import { getContextBuilder } from '../services/context-builder';
-
-// Check if running in WSL2
-function isWSL(): boolean {
-  if (process.platform !== 'linux') return false;
-  try {
-    const release = fs.readFileSync('/proc/version', 'utf8').toLowerCase();
-    return release.includes('microsoft') || release.includes('wsl');
-  } catch {
-    return false;
-  }
-}
-
-// Open URL in default browser, handling WSL2 environments
-async function openExternalUrl(url: string): Promise<void> {
-  if (isWSL()) {
-    // In WSL2, use cmd.exe to open URLs in Windows default browser
-    return new Promise((resolve, reject) => {
-      const escapedUrl = url.replace(/"/g, '\\"');
-      exec(`cmd.exe /c start "" "${escapedUrl}"`, (error) => {
-        if (error) {
-          console.error('Failed to open URL via cmd.exe:', error);
-          exec(`wslview "${escapedUrl}"`, (err2) => {
-            if (err2) {
-              reject(err2);
-            } else {
-              resolve();
-            }
-          });
-        } else {
-          resolve();
-        }
-      });
-    });
-  } else {
-    return shell.openExternal(url);
-  }
-}
+import { openExternalUrl } from '../utils/platform';
 
 export function registerIpcHandlers(pythonBackend: PythonBackend): void {
   // App info handlers
@@ -137,8 +102,37 @@ export function registerIpcHandlers(pythonBackend: PythonBackend): void {
     }
   });
 
-  ipcMain.handle('shell:openPath', async (_, path: string) => {
-    return shell.openPath(path);
+  ipcMain.handle('shell:openPath', async (_, filePath: string) => {
+    const resolved = path.resolve(filePath);
+
+    // Block executable files
+    const blockedExtensions = ['.exe', '.bat', '.cmd', '.ps1', '.sh', '.com', '.msi', '.vbs', '.wsf'];
+    const ext = path.extname(resolved).toLowerCase();
+    if (blockedExtensions.includes(ext)) {
+      throw new Error(`Opening executable files is not allowed: ${ext}`);
+    }
+
+    // Validate path is within safe directories
+    const safeRoots = [
+      app.getPath('userData'),
+      app.getPath('home'),
+      app.getPath('documents'),
+      app.getPath('downloads'),
+      app.getPath('desktop'),
+      os.tmpdir(),
+    ];
+
+    const isInSafeDir = safeRoots.some((root) => resolved.startsWith(root));
+    if (!isInSafeDir) {
+      throw new Error(`Path is outside allowed directories: ${resolved}`);
+    }
+
+    // Verify path exists
+    if (!fs.existsSync(resolved)) {
+      throw new Error(`Path does not exist: ${resolved}`);
+    }
+
+    return shell.openPath(resolved);
   });
 
   // Settings handlers

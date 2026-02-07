@@ -21,13 +21,9 @@ import { HelpTooltip } from './HelpTooltip';
 import type { ParameterInfo, CredentialInfo } from '../types/api';
 import FolderBrowserDialog from './FolderBrowserDialog';
 import { createLogger } from '../utils/logger';
+import { isElectron } from '../utils/platform';
 
 const logger = createLogger('ParameterInput');
-
-// Check if running in Electron
-const isElectron = (): boolean => {
-  return typeof window !== 'undefined' && !!window.electronAPI;
-};
 
 interface ParameterInputProps {
   parameter: ParameterInfo;

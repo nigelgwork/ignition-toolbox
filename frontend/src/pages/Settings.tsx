@@ -53,22 +53,11 @@ import { api } from '../api/client';
 import { useStore } from '../store';
 import type { HealthResponse } from '../types/api';
 import packageJson from '../../package.json';
+import { isElectron } from '../utils/platform';
 
 type SettingsTab = 'credentials' | 'executions' | 'diagnostics' | 'updates' | 'appearance' | 'chat' | 'about';
 
-interface UpdateStatus {
-  checking: boolean;
-  available: boolean;
-  downloading: boolean;
-  downloaded: boolean;
-  progress?: number;
-  error?: string;
-  updateInfo?: {
-    version: string;
-    releaseDate: string;
-    releaseNotes?: string;
-  };
-}
+// UpdateStatus type is declared globally in types/electron.d.ts
 
 const settingsTabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: 'credentials', label: 'Gateway Credentials', icon: <CredentialsIcon /> },
@@ -79,11 +68,6 @@ const settingsTabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] 
   { id: 'chat', label: 'Assistant', icon: <ChatIcon /> },
   { id: 'about', label: 'About', icon: <AboutIcon /> },
 ];
-
-// Check if running in Electron
-const isElectron = (): boolean => {
-  return typeof window !== 'undefined' && !!window.electronAPI;
-};
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('credentials');

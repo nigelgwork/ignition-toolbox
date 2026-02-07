@@ -1,6 +1,6 @@
 # Ignition Toolbox - Project Goals
 
-**Version:** 1.5.0
+**Version:** 1.5.3
 **Last Updated:** 2026-02-06
 **Status:** Production Ready (All Phases Complete)
 
@@ -262,7 +262,7 @@ Some acceptance testing steps require intelligent decision-making that humans OR
    - Execution replay and analysis
    - Status: ✅ Complete
 
-### Priority 2: Playbook Management (Partially Complete ⚠️)
+### Priority 2: Playbook Management (Complete ✅)
 
 6. **Playbook Library Organization**
    - Domain-based categorization (Gateway/Perspective/Designer)
@@ -285,13 +285,13 @@ Some acceptance testing steps require intelligent decision-making that humans OR
 9. **Playbook Duplication**
    - One-click duplicate existing playbook
    - Create starting point for modifications
-   - Status: ⚠️ Partial - Manual file duplication works, UI button not implemented
+   - Status: ✅ Complete (v1.4.66)
 
 10. **Playbook Editor**
     - YAML editor with syntax highlighting
     - Form-based editor for non-technical users
     - Preview changes before saving
-    - Status: ⚠️ Partial - Manual YAML editing works, dedicated UI editor not implemented
+    - Status: ✅ Complete (v1.4.68 YAML editor, v1.4.75 form editor)
 
 ### Priority 3: AI Integration (Implemented ✅)
 
@@ -307,9 +307,9 @@ Some acceptance testing steps require intelligent decision-making that humans OR
 
 13. **AI-Injectable Verification Steps**
     - perspective.verify_with_ai step type
-    - Visual regression testing with AI
+    - AI-powered visual verification with confidence scoring
     - Intelligent assertions
-    - Status: ❌ Not Implemented (Planned - v1.1.0)
+    - Status: ✅ Complete (v1.4.75)
 
 ### Priority 4: Enhanced Visual Feedback (Implemented ✅)
 
@@ -324,7 +324,7 @@ Some acceptance testing steps require intelligent decision-making that humans OR
     - Screenshot capture and comparison
     - Highlight visual differences
     - AI-assisted visual verification
-    - Status: ❌ Not Implemented (Planned - v1.2.0)
+    - Status: ❌ Removed (was implemented in v1.4.75, removed in v1.5.2 - use AI verification instead)
 
 ---
 
@@ -401,7 +401,7 @@ Users execute: `gateway_deploy.yml` → wait for completion → `perspective_ver
 
 **Current State:**
 - ✅ Step progress tracking (done)
-- ⚠️ Embedded browser view (planned v1.1.0)
+- ✅ Embedded browser view (done, v1.0.4)
 
 ---
 
@@ -425,9 +425,9 @@ Users execute: `gateway_deploy.yml` → wait for completion → `perspective_ver
 
 **Implementation Requirements:**
 - Easy-to-browse playbook library ✅ (done)
-- One-click duplication ❌ (planned v1.0.4)
-- YAML editor with AI assistance ❌ (planned v1.0.4)
-- Form-based editor for non-technical users ❌ (planned v1.0.4)
+- One-click duplication ✅ (done, v1.4.66)
+- YAML editor with AI assistance ✅ (done, v1.4.68)
+- Form-based editor for non-technical users ✅ (done, v1.4.75)
 
 ---
 
@@ -448,9 +448,9 @@ Users execute: `gateway_deploy.yml` → wait for completion → `perspective_ver
 4. **Error Analysis:** AI suggests fixes when steps fail
 
 **Implementation:**
-- AI module exists but not integrated ✅
-- AI chat interface ❌ (planned v1.0.4)
-- AI-injectable steps ❌ (planned v1.1.0)
+- AI module with Claude integration ✅ (done)
+- AI chat interface ✅ (done, v1.0.26)
+- AI-injectable steps ✅ (done, v1.4.75)
 
 ---
 
@@ -679,13 +679,8 @@ To prevent future confusion, this is the single source of truth for project goal
    - Links to deeper docs
    - **Update when:** Each release (version number, features)
 
-4. **CHANGELOG.md**
-   - Version history
-   - What changed in each release
-   - **Update when:** Each release (required)
-
-5. **VERSION file**
-   - Current version number
+4. **package.json** + **frontend/package.json**
+   - Single source of truth for version number
    - **Update when:** Each release (required)
 
 ---
@@ -693,14 +688,14 @@ To prevent future confusion, this is the single source of truth for project goal
 ### **Tier 3: Guides and References (Update as Needed)**
 
 6. **/docs/ directory**
-   - **getting_started.md** - Installation and first playbook
-   - **PLAYBOOK_MANAGEMENT.md** - How to create/edit/duplicate playbooks
+   - **DEVELOPER_GUIDE.md** - Installation and development setup
+   - **PLAYBOOK_LIBRARY.md** - Playbook library management
+   - **PLAYBOOK_BEST_PRACTICES.md** - Best practices for playbook creation
    - **playbook_syntax.md** - YAML reference
-   - **RUNNING_PLAYBOOKS.md** - Execution guide
-   - **COMPARISON.md** - When to use this vs alternatives
    - **TROUBLESHOOTING.md** - Common issues
-   - **TESTING_GUIDE.md** - How to test the toolkit
-   - **ROADMAP.md** - Planned features
+   - **API_GUIDE.md** - REST API and WebSocket reference
+   - **VERSIONING_GUIDE.md** - Version scheme and release process
+   - **CANCELLATION_PATTERN.md** - Cancellation pattern for developers
    - **Update when:** Features added, bugs found, user feedback
 
 7. **.claude/CLAUDE.md**
@@ -715,23 +710,20 @@ To prevent future confusion, this is the single source of truth for project goal
 
 **What to update for each release:**
 
-1. **VERSION file** - Bump version number
-2. **CHANGELOG.md** - Add release notes
+1. **package.json** - Bump version number
+2. **frontend/package.json** - Bump version number (must match package.json)
 3. **README.md** - Update version number, add new features if major
-4. **pyproject.toml** - Update version and description
-5. **frontend/package.json** - Update version (if frontend changes)
-6. **ignition_toolkit/api/app.py** - Update version in FastAPI app and /health endpoint
+4. Create git tag and push to trigger GitHub Actions build
 
 **What NOT to create:**
 - ❌ Session summary files (PROGRESS_STATUS.md, IMPLEMENTATION_COMPLETE.md, etc.)
 - ❌ Temporary TODO files (use GitHub Issues or project management tool)
-- ❌ Duplicate version tracking (one source of truth: VERSION file)
+- ❌ Duplicate version tracking (one source of truth: package.json)
 
 **Where to track work:**
 - ✅ Git commits with descriptive messages
 - ✅ GitHub Issues for bugs and feature requests
-- ✅ ROADMAP.md for planned features
-- ✅ CHANGELOG.md for completed work
+- ✅ ROADMAP_PHASES.md for development history
 
 ---
 
@@ -759,6 +751,6 @@ To prevent future confusion, this is the single source of truth for project goal
 
 **Last Updated:** 2026-02-06
 **Maintainer:** Nigel G
-**Status:** Production Ready (v1.5.0)
+**Status:** Production Ready (v1.5.3)
 
 **Next Steps:** See [ROADMAP_PHASES.md](/ROADMAP_PHASES.md) for development history.

@@ -70,7 +70,7 @@ export function ExecutionControls({
       logger.debug('Cancel request succeeded:', response);
     } catch (error) {
       logger.error('Failed to cancel execution:', error);
-      alert(`Failed to cancel execution: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error(`Failed to cancel execution: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       logger.debug('Cancel request complete, clearing loading state');
       cancelInProgressRef.current = false;

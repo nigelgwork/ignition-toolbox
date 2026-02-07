@@ -29,6 +29,8 @@ import {
   Tabs,
   IconButton,
   Tooltip,
+  Snackbar,
+  Alert as MuiAlert,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -76,6 +78,7 @@ export function PlaybookLibraryDialog({ open, onClose }: PlaybookLibraryDialogPr
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDomain, setSelectedDomain] = useState<string>('all');
   const [installing, setInstalling] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch available playbooks
@@ -120,7 +123,7 @@ export function PlaybookLibraryDialog({ open, onClose }: PlaybookLibraryDialogPr
     onError: (error: Error) => {
       logger.error('Installation failed:', error);
       setInstalling(null);
-      alert(`Installation failed: ${error.message}`);
+      setErrorMessage(`Installation failed: ${error.message}`);
     },
   });
 
@@ -334,6 +337,17 @@ export function PlaybookLibraryDialog({ open, onClose }: PlaybookLibraryDialogPr
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
+
+      <Snackbar
+        open={!!errorMessage}
+        autoHideDuration={6000}
+        onClose={() => setErrorMessage(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <MuiAlert onClose={() => setErrorMessage(null)} severity="error" variant="filled" sx={{ width: '100%' }}>
+          {errorMessage}
+        </MuiAlert>
+      </Snackbar>
     </Dialog>
   );
 }

@@ -1,5 +1,5 @@
 import { autoUpdater } from 'electron-updater';
-import { BrowserWindow, dialog } from 'electron';
+import { BrowserWindow } from 'electron';
 import { getSetting, setSetting } from './settings';
 import log from 'electron-log';
 
@@ -141,52 +141,6 @@ export function initAutoUpdater(window: BrowserWindow): void {
 function sendStatusToRenderer(channel: string, status: UpdateStatus): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, status);
-  }
-}
-
-/**
- * Show dialog when update is available
- */
-async function showUpdateDialog(info: { version: string; releaseNotes?: unknown }): Promise<void> {
-  if (!mainWindow) return;
-
-  const result = await dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: 'Update Available',
-    message: `A new version (${info.version}) is available.`,
-    detail: 'Would you like to download it now?',
-    buttons: ['Download', 'Skip This Version', 'Later'],
-    defaultId: 0,
-    cancelId: 2,
-  });
-
-  if (result.response === 0) {
-    // Download
-    downloadUpdate();
-  } else if (result.response === 1) {
-    // Skip this version
-    setSetting('skippedVersion', info.version);
-  }
-}
-
-/**
- * Show dialog when update is downloaded
- */
-async function showInstallDialog(info: { version: string }): Promise<void> {
-  if (!mainWindow) return;
-
-  const result = await dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: 'Update Ready',
-    message: `Version ${info.version} has been downloaded.`,
-    detail: 'The update will be installed when you quit the application. Would you like to restart now?',
-    buttons: ['Restart Now', 'Later'],
-    defaultId: 0,
-    cancelId: 1,
-  });
-
-  if (result.response === 0) {
-    quitAndInstall();
   }
 }
 

@@ -230,13 +230,13 @@ export function PlaybookCodeViewer({
                       }, 2000);
                     } else {
                       const errorData = await response.json();
-                      alert('Failed to save: ' + (errorData.detail || 'Unknown error'));
-                      saveBtn.textContent = 'Save';
+                      saveBtn.textContent = 'Error: ' + (errorData.detail || 'Unknown error');
+                      setTimeout(() => { saveBtn.textContent = 'Save'; }, 3000);
                       saveBtn.disabled = false;
                     }
-                  } catch (error) {
-                    alert('Failed to save: ' + error.message);
-                    saveBtn.textContent = 'Save';
+                  } catch (error: unknown) {
+                    saveBtn.textContent = 'Error: ' + (error instanceof Error ? error.message : String(error));
+                    setTimeout(() => { saveBtn.textContent = 'Save'; }, 3000);
                     saveBtn.disabled = false;
                   }
                 });

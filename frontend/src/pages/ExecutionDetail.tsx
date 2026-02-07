@@ -26,6 +26,8 @@ import {
   FormControlLabel,
   Tooltip,
   IconButton,
+  Snackbar,
+  Alert as MuiAlert,
 } from '@mui/material';
 import {
   CheckCircle as CompletedIcon,
@@ -64,6 +66,11 @@ export function ExecutionDetail() {
   const [showLogs, setShowLogs] = useState(false);
   const [runtime, setRuntime] = useState<string>('0s');
   const [stepViewMode, setStepViewMode] = useState<'list' | 'timeline'>('timeline');
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>({ open: false, message: '', severity: 'info' });
 
   // Fetch execution from API
   const { data: executionFromAPI, isLoading, error } = useQuery<ExecutionStatusResponse>({
@@ -304,7 +311,7 @@ export function ExecutionDetail() {
                     }, 10000);
                   } catch (error) {
                     logger.error('Failed to toggle debug mode:', error);
-                    alert(`Failed to toggle debug mode: ${error instanceof Error ? error.message : String(error)}`);
+                    setSnackbar({ open: true, message: `Failed to toggle debug mode: ${error instanceof Error ? error.message : String(error)}`, severity: 'error' });
                     // Revert on error
                     setDebugMode(!enabled);
                     setDebugModeUserOverride(false);
@@ -723,6 +730,23 @@ export function ExecutionDetail() {
         isPaused={execution.status === 'paused'}
         onClose={() => setShowCodeViewer(false)}
       />
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <MuiAlert
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
     </Box>
   );
 }

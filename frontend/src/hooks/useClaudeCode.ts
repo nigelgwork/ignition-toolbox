@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createLogger } from '../utils/logger';
+import { isElectron } from '../utils/platform';
 
 const logger = createLogger('useClaudeCode');
 
@@ -62,10 +63,10 @@ function generateId(): string {
 }
 
 /**
- * Check if running in Electron environment
+ * Check if Claude Code chat API is available in this Electron environment
  */
-function isElectron(): boolean {
-  return typeof window !== 'undefined' && !!window.electronAPI?.chat;
+function isElectronWithChat(): boolean {
+  return isElectron() && !!window.electronAPI?.chat;
 }
 
 /**
@@ -84,7 +85,7 @@ export function useClaudeCode(): UseClaudeCodeResult {
   // Check Claude Code availability on mount
   useEffect(() => {
     async function checkAvailability() {
-      if (!isElectron()) {
+      if (!isElectronWithChat()) {
         setIsAvailable(false);
         setIsCheckingAvailability(false);
         return;
@@ -111,7 +112,7 @@ export function useClaudeCode(): UseClaudeCodeResult {
 
   // Set up streaming listener
   useEffect(() => {
-    if (!isElectron()) return;
+    if (!isElectronWithChat()) return;
 
     const unsubscribe = window.electronAPI!.on('chat:stream', (chunk: unknown) => {
       const messageId = streamingMessageIdRef.current;
@@ -135,7 +136,7 @@ export function useClaudeCode(): UseClaudeCodeResult {
    * Refresh context from backend
    */
   const refreshContext = useCallback(async () => {
-    if (!isElectron()) return;
+    if (!isElectronWithChat()) return;
 
     try {
       const ctx = await window.electronAPI!.chat.getContext();

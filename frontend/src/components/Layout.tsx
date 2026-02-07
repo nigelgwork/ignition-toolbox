@@ -33,11 +33,7 @@ import { api } from '../api/client';
 import type { CredentialInfo } from '../types/api';
 import { useQuery } from '@tanstack/react-query';
 import packageJson from '../../package.json';
-
-// Check if running in Electron
-const isElectron = (): boolean => {
-  return typeof window !== 'undefined' && !!window.electronAPI;
-};
+import { isElectron } from '../utils/platform';
 
 // Domain tabs for playbook filtering
 export type DomainTab = 'gateway' | 'designer' | 'perspective' | 'executions' | 'api' | 'stackbuilder' | 'settings';

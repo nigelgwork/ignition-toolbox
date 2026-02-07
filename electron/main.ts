@@ -1,10 +1,9 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, session } from 'electron';
 import * as path from 'path';
-import { exec } from 'child_process';
-import * as fs from 'fs';
 import { PythonBackend } from './services/python-backend';
 import { registerIpcHandlers } from './ipc/handlers';
 import { initAutoUpdater } from './services/auto-updater';
+import { openExternalUrl } from './utils/platform';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling
 if (require('electron-squirrel-startup')) {
@@ -15,46 +14,6 @@ let mainWindow: BrowserWindow | null = null;
 let pythonBackend: PythonBackend | null = null;
 
 const isDev = !app.isPackaged;
-
-// Check if running in WSL2
-function isWSL(): boolean {
-  if (process.platform !== 'linux') return false;
-  try {
-    const release = fs.readFileSync('/proc/version', 'utf8').toLowerCase();
-    return release.includes('microsoft') || release.includes('wsl');
-  } catch {
-    return false;
-  }
-}
-
-// Open URL in default browser, handling WSL2 environments
-async function openExternalUrl(url: string): Promise<void> {
-  if (isWSL()) {
-    // In WSL2, use cmd.exe to open URLs in Windows default browser
-    return new Promise((resolve, reject) => {
-      // Escape the URL for Windows command line
-      const escapedUrl = url.replace(/"/g, '\\"');
-      exec(`cmd.exe /c start "" "${escapedUrl}"`, (error) => {
-        if (error) {
-          console.error('Failed to open URL via cmd.exe:', error);
-          // Fallback to wslview if available
-          exec(`wslview "${escapedUrl}"`, (err2) => {
-            if (err2) {
-              reject(err2);
-            } else {
-              resolve();
-            }
-          });
-        } else {
-          resolve();
-        }
-      });
-    });
-  } else {
-    // Standard Electron shell.openExternal for non-WSL environments
-    return shell.openExternal(url);
-  }
-}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -165,6 +124,23 @@ async function stopPythonBackend(): Promise<void> {
 
 // App lifecycle
 app.whenReady().then(async () => {
+  // Set Content Security Policy
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; " +
+          "script-src 'self' 'unsafe-inline'; " +
+          "style-src 'self' 'unsafe-inline'; " +
+          "connect-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*; " +
+          "img-src 'self' data: blob:; " +
+          "font-src 'self' data:;"
+        ],
+      },
+    });
+  });
+
   // Start Python backend first
   await startPythonBackend();
 

@@ -5,6 +5,7 @@ Provides API key-based authentication for production deployment.
 For localhost-only use, authentication can be disabled via environment variable.
 """
 
+import hmac
 import logging
 import os
 import secrets
@@ -110,8 +111,8 @@ async def verify_api_key(api_key: Optional[str] = Header(None, alias=API_KEY_HEA
             headers={"WWW-Authenticate": "ApiKey"},
         )
 
-    # Verify API key
-    if api_key != API_KEY:
+    # Verify API key using constant-time comparison to prevent timing attacks
+    if not hmac.compare_digest(api_key, API_KEY):
         raise HTTPException(
             status_code=403,
             detail="Invalid API key",
