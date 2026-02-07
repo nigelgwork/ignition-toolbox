@@ -32,18 +32,33 @@ import { createLogger } from '../utils/logger';
 
 /** API Explorer - stored API key info */
 export interface ApiKeyInfo {
+  id?: number;
   name: string;
   gateway_url: string;
+  has_api_key?: boolean;
   description?: string;
   created_at?: string;
+  last_used?: string;
 }
 
 /** API Explorer - gateway info response */
 export interface GatewayInfoResponse {
-  platform: string;
-  version: string;
-  edition: string;
-  state: string;
+  platform?: string;
+  version?: string;
+  edition?: string;
+  state?: string;
+  system?: {
+    version?: string;
+    edition?: string;
+    uptime?: string;
+    [key: string]: unknown;
+  };
+  license?: {
+    isValid?: boolean;
+    expirationDate?: string;
+    [key: string]: unknown;
+  };
+  modules?: Array<{ name: string; state: string; [key: string]: unknown }>;
   [key: string]: unknown;
 }
 
@@ -67,12 +82,27 @@ export interface ExplorerRequestResponse {
   headers: Record<string, string>;
   body: unknown;
   elapsed_ms: number;
+  [key: string]: unknown;
 }
 
 /** StackBuilder - catalog response */
 export interface StackBuilderCatalog {
   applications: StackBuilderApplication[];
   categories: StackBuilderCategory[];
+}
+
+/** StackBuilder - configurable option for a service */
+export interface ConfigurableOption {
+  type: 'text' | 'password' | 'number' | 'select' | 'multiselect' | 'checkbox' | 'textarea';
+  label?: string;
+  default?: unknown;
+  options?: Array<{ value: string; label: string; description?: string } | string>;
+  required?: boolean;
+  visible?: boolean;
+  description?: string;
+  placeholder?: string;
+  version_constraint?: string;
+  [key: string]: unknown;
 }
 
 /** StackBuilder - application entry */
@@ -90,7 +120,7 @@ export interface StackBuilderApplication {
     environment?: Record<string, string>;
     volumes?: string[];
   };
-  configurable_options?: Record<string, unknown>;
+  configurable_options?: Record<string, ConfigurableOption>;
   config_schema?: Record<string, unknown>;
   [key: string]: unknown;
 }
@@ -137,7 +167,7 @@ export interface IntegrationDetectionResult {
   suggestions: string[];
   conflicts?: Array<{ message: string; [key: string]: unknown }>;
   warnings?: Array<{ message: string; [key: string]: unknown }>;
-  summary?: string;
+  summary?: string[];
 }
 
 /** Playbook export data */
@@ -172,6 +202,14 @@ export interface PlaybookImportResponse {
 export interface DebugContextResponse {
   execution_id: string;
   current_step: string;
+  step_name: string;
+  step_type: string;
+  step_id: string;
+  step_parameters: Record<string, unknown>;
+  error: string;
+  screenshot_base64?: string;
+  page_html?: string;
+  timestamp: string;
   variables: Record<string, unknown>;
   browser_state: Record<string, unknown>;
   [key: string]: unknown;

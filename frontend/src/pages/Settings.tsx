@@ -57,7 +57,19 @@ import { isElectron } from '../utils/platform';
 
 type SettingsTab = 'credentials' | 'executions' | 'diagnostics' | 'updates' | 'appearance' | 'chat' | 'about';
 
-// UpdateStatus type is declared globally in types/electron.d.ts
+interface UpdateStatus {
+  checking: boolean;
+  available: boolean;
+  downloading: boolean;
+  downloaded: boolean;
+  progress?: number;
+  error?: string;
+  updateInfo?: {
+    version: string;
+    releaseDate: string;
+    releaseNotes?: string;
+  };
+}
 
 const settingsTabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: 'credentials', label: 'Gateway Credentials', icon: <CredentialsIcon /> },

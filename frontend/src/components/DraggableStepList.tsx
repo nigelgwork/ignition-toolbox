@@ -46,7 +46,7 @@ interface StepConfig {
   id: string;
   name: string;
   type: string;
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
   timeout?: number;
   retry_count?: number;
   retry_delay?: number;

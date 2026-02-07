@@ -34,7 +34,6 @@ export function ExecutionControls({
   executionId,
   status,
   disabled = false,
-  debugMode: _debugMode = false,
 }: ExecutionControlsProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const cancelInProgressRef = useRef(false);

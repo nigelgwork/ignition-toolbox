@@ -309,6 +309,7 @@ export function ActionBlock({ action, onActionComplete }: ActionBlockProps) {
 /**
  * Parse assistant-action blocks from message content
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function parseActionBlocks(content: string): ParsedAction[] {
   const actions: ParsedAction[] = [];
 
@@ -338,6 +339,7 @@ export function parseActionBlocks(content: string): ParsedAction[] {
 /**
  * Remove assistant-action blocks from content for clean display
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function removeActionBlocks(content: string): string {
   return content.replace(/```(?:assistant|clawdbot)-action\s*\n?[\s\S]*?```/g, '').trim();
 }

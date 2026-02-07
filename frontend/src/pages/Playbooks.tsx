@@ -220,7 +220,7 @@ export function Playbooks({ domainFilter }: PlaybooksProps) {
   const [stepsDialogPlaybook, setStepsDialogPlaybook] = useState<PlaybookInfo | null>(null);
   const [editorPlaybook, setEditorPlaybook] = useState<PlaybookInfo | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const { expanded: expandedGroups, setExpanded: setGroupExpanded, toggleExpanded: toggleGroupExpanded } = useGroupExpanded();
+  const { expanded: expandedGroups, toggleExpanded: toggleGroupExpanded } = useGroupExpanded();
   const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
   const [updatesDialogOpen, setUpdatesDialogOpen] = useState(false);
 

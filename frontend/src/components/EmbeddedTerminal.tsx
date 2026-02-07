@@ -126,7 +126,7 @@ export function EmbeddedTerminal({
                   }
                 }, 1000);
               }
-            } catch (e) {
+            } catch {
               // Not JSON, ignore
             }
           }

@@ -44,7 +44,7 @@ import {
   PlayArrow as ScanIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, type ApiKeyInfo } from '../api/client';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -58,16 +58,6 @@ function TabPanel({ children, value, index }: TabPanelProps) {
       {value === index && children}
     </Box>
   );
-}
-
-interface APIKeyInfo {
-  id: number;
-  name: string;
-  gateway_url: string;
-  has_api_key: boolean;
-  description?: string;
-  created_at?: string;
-  last_used?: string;
 }
 
 interface APIKeyDialogProps {
@@ -161,7 +151,7 @@ export function APIExplorer() {
   const [requestError, setRequestError] = useState<string | null>(null);
 
   // Fetch API keys
-  const { data: apiKeys = [] } = useQuery<APIKeyInfo[]>({
+  const { data: apiKeys = [] } = useQuery<ApiKeyInfo[]>({
     queryKey: ['api-keys'],
     queryFn: () => api.apiExplorer.listApiKeys(),
   });

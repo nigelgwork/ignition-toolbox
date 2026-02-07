@@ -58,7 +58,7 @@ import {
   Circle as StatusIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, type StackBuilderApplication } from '../api/client';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -80,38 +80,14 @@ interface ServiceInstance {
   config: Record<string, unknown>;
 }
 
-interface ConfigurableOption {
-  type: 'text' | 'password' | 'number' | 'select' | 'multiselect' | 'checkbox' | 'textarea';
-  label?: string;
-  default?: unknown;
-  options?: Array<{ value: string; label: string; description?: string } | string>;
-  required?: boolean;
-  visible?: boolean;
-  description?: string;
-  placeholder?: string;
-  version_constraint?: string;
-}
-
-interface ServiceApplication {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  image: string;
-  enabled: boolean;
-  default_version?: string;
-  default_config?: {
-    ports?: string[];
-    environment?: Record<string, string>;
-    volumes?: string[];
-  };
-  configurable_options?: Record<string, ConfigurableOption>;
-}
+/** Local alias for StackBuilderApplication */
+type ServiceApplication = StackBuilderApplication;
 
 interface GlobalSettings {
   stack_name: string;
   timezone: string;
   restart_policy: string;
+  [key: string]: unknown;
 }
 
 interface IntegrationSettings {
@@ -137,6 +113,7 @@ interface IntegrationSettings {
     from_address: string;
     auto_configure_services: boolean;
   };
+  [key: string]: unknown;
 }
 
 interface SavedStack {
@@ -1299,7 +1276,7 @@ export function StackBuilder() {
                 Detected Integrations
               </Typography>
 
-              {integrations.conflicts?.length > 0 && (
+              {integrations.conflicts && integrations.conflicts.length > 0 && (
                 <Alert severity="error" sx={{ mb: 1 }}>
                   {integrations.conflicts.map((c: { message: string }, i: number) => (
                     <div key={i}>{c.message}</div>
@@ -1307,7 +1284,7 @@ export function StackBuilder() {
                 </Alert>
               )}
 
-              {integrations.warnings?.length > 0 && (
+              {integrations.warnings && integrations.warnings.length > 0 && (
                 <Alert severity="warning" sx={{ mb: 1 }}>
                   {integrations.warnings.map((w: { message: string }, i: number) => (
                     <div key={i}>{w.message}</div>

@@ -109,7 +109,7 @@ export interface StepResult {
   completed_at: string | null;
   output?: {
     _output?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

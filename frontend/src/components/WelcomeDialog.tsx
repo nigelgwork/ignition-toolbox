@@ -145,6 +145,7 @@ export function WelcomeDialog() {
 /**
  * Reset the welcome dialog (for testing)
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function resetWelcomeDialog() {
   localStorage.removeItem(STORAGE_KEY);
 }

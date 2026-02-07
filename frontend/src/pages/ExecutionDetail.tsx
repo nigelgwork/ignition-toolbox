@@ -88,16 +88,8 @@ export function ExecutionDetail() {
     refetchInterval: showLogs ? 3000 : false, // Refetch every 3 seconds when visible
   });
 
-  if (!executionId) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography color="error">Invalid execution ID</Typography>
-      </Box>
-    );
-  }
-
   // Use WebSocket update if available, otherwise use API data
-  const wsUpdate = executionUpdates.get(executionId);
+  const wsUpdate = executionId ? executionUpdates.get(executionId) : undefined;
   const execution = wsUpdate || executionFromAPI;
 
   // Deduplicate step results by step_id (keep the most recent - completed over pending)
@@ -163,6 +155,14 @@ export function ExecutionDetail() {
       return () => clearInterval(interval);
     }
   }, [execution?.started_at, execution?.completed_at, execution?.status]);
+
+  if (!executionId) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography color="error">Invalid execution ID</Typography>
+      </Box>
+    );
+  }
 
   // Auto-show debug panel when execution is paused and debug mode is on
   // Look for a failed step in the results

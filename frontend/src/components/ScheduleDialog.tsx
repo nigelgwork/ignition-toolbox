@@ -89,14 +89,16 @@ export default function ScheduleDialog({
       case 'daily':
         setPreview(`Every day at ${scheduleTime}`);
         break;
-      case 'weekly':
+      case 'weekly': {
         const days = selectedDays.map(d => DAYS_OF_WEEK.find(day => day.value === d)?.label).join(', ');
         setPreview(`Every ${days} at ${scheduleTime}`);
         break;
-      case 'monthly':
+      }
+      case 'monthly': {
         const suffix = getDaySuffix(dayOfMonth);
         setPreview(`Every month on the ${dayOfMonth}${suffix} at ${scheduleTime}`);
         break;
+      }
       case 'cron':
         setPreview(`Cron: ${cronExpression}`);
         break;

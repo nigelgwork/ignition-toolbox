@@ -143,7 +143,7 @@ export function DiagnosticsPanel() {
     try {
       const response = await api.diagnostics.getDetailedHealth();
       setHealth(response);
-    } catch (err) {
+    } catch {
       // Don't set error for health - it's non-critical
     } finally {
       setHealthLoading(false);
@@ -156,7 +156,7 @@ export function DiagnosticsPanel() {
     try {
       const response = await api.diagnostics.getDatabaseStats();
       setDbStats(response);
-    } catch (err) {
+    } catch {
       // Non-critical
     } finally {
       setDbLoading(false);
@@ -169,7 +169,7 @@ export function DiagnosticsPanel() {
     try {
       const response = await api.diagnostics.getStorageStats();
       setStorageStats(response);
-    } catch (err) {
+    } catch {
       // Non-critical
     } finally {
       setStorageLoading(false);
