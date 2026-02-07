@@ -47,14 +47,33 @@ export class PythonBackend {
   }
 
   /**
-   * Find a free port for the backend server
+   * Find a free port for the backend server.
+   * Uses a fixed range (5000-5099) to avoid Windows Hyper-V ephemeral port
+   * reservations that cause EACCES errors with random OS-assigned ports.
    */
   private async findFreePort(): Promise<number> {
+    const net = require('net');
+    const startPort = 5000;
+    const endPort = 5099;
+
+    for (let port = startPort; port <= endPort; port++) {
+      const available = await new Promise<boolean>((resolve) => {
+        const server = net.createServer();
+        server.unref();
+        server.on('error', () => resolve(false));
+        server.listen(port, '127.0.0.1', () => {
+          server.close(() => resolve(true));
+        });
+      });
+      if (available) return port;
+    }
+
+    // Fallback to OS-assigned port if range is exhausted
     return new Promise((resolve, reject) => {
-      const server = require('net').createServer();
+      const server = net.createServer();
       server.unref();
       server.on('error', reject);
-      server.listen(0, () => {
+      server.listen(0, '127.0.0.1', () => {
         const port = server.address().port;
         server.close(() => resolve(port));
       });
