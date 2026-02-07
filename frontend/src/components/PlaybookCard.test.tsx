@@ -257,7 +257,7 @@ describe('PlaybookCard', () => {
 
     // Menu items should be visible
     expect(screen.getByText('Show Details')).toBeInTheDocument();
-    expect(screen.getByText('Edit Playbook')).toBeInTheDocument();
+    expect(screen.getByText('Edit Name/Description')).toBeInTheDocument();
     expect(screen.getByText('Duplicate Playbook')).toBeInTheDocument();
   });
 
