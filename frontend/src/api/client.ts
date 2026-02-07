@@ -81,9 +81,17 @@ export interface StackBuilderApplication {
   name: string;
   description: string;
   category: string;
+  image: string;
+  enabled: boolean;
   icon?: string;
-  default_config: Record<string, unknown>;
-  config_schema: Record<string, unknown>;
+  default_version?: string;
+  default_config?: {
+    ports?: string[];
+    environment?: Record<string, string>;
+    volumes?: string[];
+  };
+  configurable_options?: Record<string, unknown>;
+  config_schema?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -100,8 +108,19 @@ export interface SavedStack {
   id: number;
   stack_name: string;
   description?: string;
-  config_json: Record<string, unknown>;
-  global_settings?: Record<string, unknown>;
+  config_json: {
+    instances: Array<{
+      app_id: string;
+      instance_name: string;
+      config: Record<string, unknown>;
+    }>;
+  };
+  global_settings?: {
+    stack_name: string;
+    timezone: string;
+    restart_policy: string;
+    [key: string]: unknown;
+  };
   created_at?: string;
   updated_at?: string;
 }
@@ -116,6 +135,9 @@ export interface IntegrationDetectionResult {
     [key: string]: unknown;
   }>;
   suggestions: string[];
+  conflicts?: Array<{ message: string; [key: string]: unknown }>;
+  warnings?: Array<{ message: string; [key: string]: unknown }>;
+  summary?: string;
 }
 
 /** Playbook export data */
@@ -166,8 +188,11 @@ export interface StackBuilderConfig {
     stack_name?: string;
     timezone?: string;
     restart_policy?: string;
+    [key: string]: unknown;
   };
-  integration_settings?: Record<string, unknown>;
+  integration_settings?: {
+    [key: string]: unknown;
+  };
 }
 
 const logger = createLogger('API');
