@@ -1,6 +1,6 @@
 # Playbook Library - User Guide
 
-**Version:** 1.5.4
+**Version:** 1.5.5
 **Last Updated:** 2026-02-06
 
 ## Overview
