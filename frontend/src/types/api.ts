@@ -177,7 +177,7 @@ export interface DockerStatus {
 }
 
 export interface CloudDesignerStatus {
-  status: 'running' | 'exited' | 'paused' | 'not_created' | 'unknown';
+  status: 'running' | 'exited' | 'paused' | 'restarting' | 'created' | 'not_created' | 'unknown';
   port?: number;
   error?: string;
 }

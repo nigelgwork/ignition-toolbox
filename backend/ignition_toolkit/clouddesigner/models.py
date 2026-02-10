@@ -7,7 +7,7 @@ Contains dataclasses for Docker and container status.
 from dataclasses import dataclass
 from typing import Literal
 
-ContainerStatus = Literal["running", "exited", "paused", "not_created", "unknown"]
+ContainerStatus = Literal["running", "exited", "paused", "restarting", "created", "not_created", "unknown"]
 
 
 @dataclass

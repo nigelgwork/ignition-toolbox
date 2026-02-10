@@ -99,6 +99,7 @@ steps:
     parameters:
       selector: "button:has-text('Save'), button:has-text('Create'), button:has-text('Submit'), button[type='submit']"
       timeout: 10000
+      force: true
     on_failure: abort
 
   - id: step10

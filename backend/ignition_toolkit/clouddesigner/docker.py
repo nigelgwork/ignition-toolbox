@@ -359,6 +359,42 @@ def is_using_wsl_docker() -> bool:
     return docker_path == "wsl docker"
 
 
+def get_wsl_prefix() -> list[str]:
+    """
+    Get the WSL command prefix without 'docker'.
+
+    Extracts just the WSL invocation part from the cached docker command.
+    For example, if the docker command is ["wsl", "-d", "Ubuntu", "docker"],
+    this returns ["wsl", "-d", "Ubuntu"].
+
+    Returns:
+        List with the WSL command prefix for running arbitrary commands in WSL
+    """
+    global _wsl_docker_command
+
+    if _wsl_docker_command:
+        prefix = _wsl_docker_command.copy()
+        # Remove 'docker' from the end
+        if prefix and prefix[-1] == "docker":
+            prefix.pop()
+        # Remove 'sudo' if present (not needed for non-docker commands like ip)
+        while prefix and prefix[-1] == "sudo":
+            prefix.pop()
+        if prefix:
+            return prefix
+
+    return ["wsl"]
+
+
+def invalidate_docker_detection_cache() -> None:
+    """Reset the Docker detection cache, forcing re-detection on next call."""
+    global _docker_detection_done, _docker_detection_cache, _wsl_docker_command
+    _docker_detection_done = False
+    _docker_detection_cache.clear()
+    _wsl_docker_command = None
+    logger.info("[CloudDesigner] Docker detection cache invalidated")
+
+
 def windows_to_wsl_path(windows_path: Path | str) -> str:
     """
     Convert a Windows path to a WSL path.
@@ -419,10 +455,10 @@ def get_docker_host_ip() -> str | None:
     use_wsl = is_using_wsl_docker()
     if use_wsl:
         try:
-            docker_cmd = get_docker_command()
+            wsl_prefix = get_wsl_prefix()
             # Get the default gateway inside WSL (this is the Windows host from WSL's perspective)
             result = subprocess.run(
-                docker_cmd[:-1] + ["ip", "route"],  # Remove 'docker' from cmd, add 'ip route'
+                wsl_prefix + ["ip", "route"],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',

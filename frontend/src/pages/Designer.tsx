@@ -147,6 +147,14 @@ export function Designer() {
     },
   });
 
+  // Query all container statuses - for debug panel
+  const { data: allStatuses, refetch: refetchAllStatuses } = useQuery<{ statuses: Record<string, string> }>({
+    queryKey: ['clouddesigner-all-statuses'],
+    queryFn: api.cloudDesigner.getAllStatuses,
+    enabled: showDebug && dockerStatus?.running === true,
+    refetchInterval: showDebug ? 5000 : false,
+  });
+
   // Query recent logs for debugging - also poll while starting or preparing (must be after mutations)
   const { data: logsData, refetch: refetchLogs } = useQuery({
     queryKey: ['docker-detection-logs'],
@@ -431,6 +439,15 @@ docker info`}
               </Alert>
             )}
 
+            {/* Container status error (from polling) */}
+            {!startError && containerStatus?.error && !isRunning && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                {containerStatus.status === 'restarting'
+                  ? 'Container is crash-looping. Check Docker logs for details.'
+                  : containerStatus.error}
+              </Alert>
+            )}
+
             {/* ===== STAGE 1: Image Readiness ===== */}
             {!isRunning && (
               <Box sx={{ mb: 2 }}>
@@ -613,7 +630,10 @@ docker info`}
               expanded={showDebug}
               onChange={() => {
                 setShowDebug(!showDebug);
-                if (!showDebug) refetchLogs();
+                if (!showDebug) {
+                  refetchLogs();
+                  refetchAllStatuses();
+                }
               }}
               sx={{ mt: 2, bgcolor: 'background.paper' }}
             >
@@ -638,8 +658,8 @@ docker info`}
 Running: ${dockerStatus.running}
 Version: ${dockerStatus.version || 'Not detected'}
 Path: ${dockerStatus.docker_path || 'Not found'}
-Container: ${containerStatus?.status || 'not_created'}
-Images Ready: ${imagesReady ? 'Yes' : 'No'}`}
+Primary Container: ${containerStatus?.status || 'not_created'}
+Images Ready: ${imagesReady ? 'Yes' : 'No'}${allStatuses?.statuses ? '\n\nAll Containers:\n' + Object.entries(allStatuses.statuses).map(([name, status]) => `  ${name.replace('clouddesigner-', '')}: ${status}`).join('\n') : ''}`}
                     </Typography>
                   </Box>
 

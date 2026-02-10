@@ -16,7 +16,6 @@ from ignition_toolkit.clouddesigner.docker import (
     get_docker_files_path,
     is_using_wsl_docker,
     translate_localhost_url,
-    windows_to_wsl_path,
 )
 from ignition_toolkit.clouddesigner.models import (
     CloudDesignerStatus,
@@ -50,23 +49,51 @@ class CloudDesignerManager:
     def __init__(self):
         self.compose_dir = get_docker_files_path()
 
-    def _get_compose_args(self) -> tuple[list[str], str | None]:
+    def _get_compose_args(self) -> tuple[list[str], "Path"]:
         """
         Get docker compose arguments and working directory.
 
-        Returns:
-            Tuple of (compose_args, run_cwd) where run_cwd may be None for WSL.
-        """
-        use_wsl = is_using_wsl_docker()
-        compose_file = self.compose_dir / "docker-compose.yml"
+        Uses cwd-based approach for both WSL and native Docker.
+        Docker Compose finds docker-compose.yml and .env in the working directory.
 
-        if use_wsl:
-            wsl_compose_file = windows_to_wsl_path(compose_file)
-            wsl_compose_dir = windows_to_wsl_path(self.compose_dir)
-            compose_args = ["compose", "-f", wsl_compose_file, "--project-directory", wsl_compose_dir]
-            return compose_args, None
-        else:
-            return ["compose"], self.compose_dir
+        For WSL, this avoids path-quoting issues when paths contain spaces
+        (e.g., /mnt/c/Program Files/...). The cwd is set at the OS process level
+        and doesn't go through shell argument parsing.
+
+        Returns:
+            Tuple of (compose_args, run_cwd)
+        """
+        return ["compose"], self.compose_dir
+
+    def _write_compose_env(self, env_vars: dict[str, str]) -> None:
+        """
+        Write a .env file for Docker Compose in the compose directory.
+
+        This is the reliable way to pass environment variables to Docker Compose,
+        especially when running through WSL where Windows env vars are NOT
+        automatically forwarded to the Linux environment.
+
+        Docker Compose automatically reads .env from the project directory.
+
+        Args:
+            env_vars: Dictionary of environment variable names to values
+        """
+        env_file = self.compose_dir / ".env"
+        lines = []
+        for key, value in env_vars.items():
+            if value is None:
+                continue
+            # Docker Compose .env format: KEY=VALUE
+            # Quote values containing spaces, quotes, or special characters
+            if any(c in value for c in ' "\'\n\\$#'):
+                escaped = value.replace('\\', '\\\\').replace('"', '\\"')
+                lines.append(f'{key}="{escaped}"')
+            else:
+                lines.append(f'{key}={value}')
+
+        env_file.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        # Log var names but not values (may contain passwords)
+        logger.info(f"[CloudDesigner] Wrote .env file with variables: {list(env_vars.keys())}")
 
     def _image_exists(self, image_name: str) -> bool:
         """Check if a Docker image exists locally."""
@@ -318,6 +345,37 @@ class CloudDesignerManager:
             docker_path=display_path,
         )
 
+    def get_all_container_statuses(self) -> dict[str, str]:
+        """
+        Get status of all CloudDesigner containers.
+
+        Returns:
+            dict mapping container name to status string
+            (e.g., {"clouddesigner-desktop": "running", "clouddesigner-nginx": "running"})
+        """
+        docker_cmd = get_docker_command()
+        statuses = {}
+        for name in self.ALL_CONTAINER_NAMES:
+            try:
+                result = subprocess.run(
+                    docker_cmd + ["inspect", "-f", "{{.State.Status}}", name],
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    timeout=10,
+                    creationflags=CREATION_FLAGS,
+                )
+                if result.returncode == 0:
+                    statuses[name] = result.stdout.strip().lower()
+                else:
+                    statuses[name] = "not_found"
+            except subprocess.TimeoutExpired:
+                statuses[name] = "timeout"
+            except Exception:
+                statuses[name] = "error"
+        return statuses
+
     def get_container_status(self) -> CloudDesignerStatus:
         """Check clouddesigner-desktop container status."""
         try:
@@ -351,8 +409,21 @@ class CloudDesignerManager:
                 return CloudDesignerStatus(status="exited")
             elif status == "paused":
                 return CloudDesignerStatus(status="paused")
+            elif status == "restarting":
+                return CloudDesignerStatus(
+                    status="restarting",
+                    error="Container is crash-looping. Check Docker logs for details.",
+                )
+            elif status == "created":
+                return CloudDesignerStatus(
+                    status="created",
+                    error="Container was created but hasn't started yet.",
+                )
             else:
-                return CloudDesignerStatus(status="unknown")
+                return CloudDesignerStatus(
+                    status="unknown",
+                    error=f"Unexpected container state: {status}",
+                )
 
         except FileNotFoundError:
             return CloudDesignerStatus(
@@ -552,6 +623,8 @@ class CloudDesignerManager:
         logger.info(f"[CloudDesigner] Credential: {credential_name}")
         logger.info(f"[CloudDesigner] Force rebuild: {force_rebuild}")
         logger.info(f"[CloudDesigner] Compose dir: {self.compose_dir}")
+        logger.info(f"[CloudDesigner] Compose dir exists: {self.compose_dir.exists()}")
+        logger.info(f"[CloudDesigner] Using WSL Docker: {is_using_wsl_docker()}")
 
         if not self.compose_dir.exists():
             logger.error(f"[CloudDesigner] Docker compose directory not found: {self.compose_dir}")
@@ -607,6 +680,25 @@ class CloudDesignerManager:
                     logger.warning(f"[CloudDesigner] Credential '{credential_name}' not found in vault")
             except Exception as e:
                 logger.exception(f"[CloudDesigner] Failed to load credentials: {e}")
+
+        # Write .env file for Docker Compose
+        # This ensures env vars reach Docker Compose even when running through WSL,
+        # where Windows environment variables are not automatically forwarded.
+        compose_env: dict[str, str] = {
+            "IGNITION_GATEWAY_URL": docker_gateway_url,
+        }
+        if env.get("IGNITION_USERNAME"):
+            compose_env["IGNITION_USERNAME"] = env["IGNITION_USERNAME"]
+        if env.get("IGNITION_PASSWORD"):
+            compose_env["IGNITION_PASSWORD"] = env["IGNITION_PASSWORD"]
+        try:
+            self._write_compose_env(compose_env)
+        except OSError as e:
+            logger.error(f"[CloudDesigner] Failed to write .env file: {e}")
+            return {
+                "success": False,
+                "error": f"Failed to write Docker Compose environment file: {e}",
+            }
 
         try:
             logger.info(f"[CloudDesigner] ========================================")
@@ -721,8 +813,11 @@ class CloudDesignerManager:
             logger.info(f"[CloudDesigner] STEP {current_step}/{step_count}: Starting containers...")
             logger.info(f"[CloudDesigner] ----------------------------------------")
 
+            up_cmd = docker_cmd + compose_args + ["up", "-d"]
+            logger.info(f"[CloudDesigner] Running: {' '.join(up_cmd)} (cwd={run_cwd})")
+
             result = subprocess.run(
-                docker_cmd + compose_args + ["up", "-d"],
+                up_cmd,
                 cwd=run_cwd,
                 env=env,
                 capture_output=True,
@@ -733,6 +828,12 @@ class CloudDesignerManager:
                 creationflags=CREATION_FLAGS,
             )
 
+            logger.info(f"[CloudDesigner] compose up returned code {result.returncode}")
+            if result.stdout:
+                logger.info(f"[CloudDesigner] compose up stdout: {result.stdout[:500]}")
+            if result.stderr:
+                logger.info(f"[CloudDesigner] compose up stderr: {result.stderr[:500]}")
+
             if result.returncode == 0:
                 logger.info(f"[CloudDesigner] Step {current_step} complete: Containers started")
                 logger.info("[CloudDesigner] ========================================")
@@ -740,9 +841,56 @@ class CloudDesignerManager:
                 logger.info("[CloudDesigner] Access at: http://localhost:8080")
                 logger.info("[CloudDesigner] ========================================")
 
-                time.sleep(3)
+                # Wait for containers to initialize, then check all container statuses
+                time.sleep(5)
+                all_statuses = self.get_all_container_statuses()
+                logger.info(f"[CloudDesigner] All container statuses after startup: {all_statuses}")
+
                 container_status = self.get_container_status()
-                logger.info(f"[CloudDesigner] Container status after startup: {container_status.status}")
+                logger.info(f"[CloudDesigner] Primary container status: {container_status.status}")
+
+                # Check if any container failed to start
+                failed_containers = {
+                    name: status for name, status in all_statuses.items()
+                    if status not in ("running",)
+                }
+
+                if container_status.status != "running" or failed_containers:
+                    # Log which containers failed
+                    for name, status in failed_containers.items():
+                        logger.warning(f"[CloudDesigner] Container {name} is not running (status: {status})")
+
+                    # Fetch compose logs for diagnosis
+                    try:
+                        logs_result = subprocess.run(
+                            docker_cmd + compose_args + ["logs", "--tail=30"],
+                            cwd=run_cwd,
+                            env=env,
+                            capture_output=True,
+                            text=True,
+                            encoding='utf-8',
+                            errors='replace',
+                            timeout=15,
+                            creationflags=CREATION_FLAGS,
+                        )
+                        if logs_result.stdout:
+                            logger.warning(f"[CloudDesigner] Container logs:\n{logs_result.stdout[-1500:]}")
+                        if logs_result.stderr:
+                            logger.warning(f"[CloudDesigner] Container stderr:\n{logs_result.stderr[-500:]}")
+                    except Exception as log_error:
+                        logger.warning(f"[CloudDesigner] Could not fetch container logs: {log_error}")
+
+                    if container_status.status != "running":
+                        # Primary container failed — report failure
+                        status_summary = ", ".join(f"{n.replace('clouddesigner-', '')}: {s}" for n, s in all_statuses.items())
+                        return {
+                            "success": False,
+                            "error": f"Containers failed to reach running state. Status: {status_summary}",
+                            "output": result.stdout,
+                        }
+                    else:
+                        # Primary is running but some auxiliary containers failed — warn but continue
+                        logger.warning("[CloudDesigner] Primary container running but some auxiliary containers failed")
 
                 return {
                     "success": True,

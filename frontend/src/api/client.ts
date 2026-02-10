@@ -950,6 +950,9 @@ export const api = {
 
     getConfig: () =>
       fetchJSON<CloudDesignerConfig>('/api/clouddesigner/config'),
+
+    getAllStatuses: () =>
+      fetchJSON<{ statuses: Record<string, string> }>('/api/clouddesigner/all-statuses'),
   },
 
   /**

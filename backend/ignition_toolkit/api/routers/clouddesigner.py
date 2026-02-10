@@ -39,7 +39,7 @@ class DockerStatusResponse(BaseModel):
 class CloudDesignerStatusResponse(BaseModel):
     """CloudDesigner container status response"""
 
-    status: str  # running, exited, paused, not_created, unknown
+    status: str  # running, exited, paused, restarting, created, not_created, unknown
     port: int | None = None
     error: str | None = None
 
@@ -78,6 +78,12 @@ class CleanupResponse(BaseModel):
     success: bool
     output: str | None = None
     error: str | None = None
+
+
+class AllContainerStatusResponse(BaseModel):
+    """Status of all CloudDesigner containers"""
+
+    statuses: dict[str, str]
 
 
 class ConfigResponse(BaseModel):
@@ -350,6 +356,24 @@ async def prepare_images(request: PrepareRequest):
         )
     except Exception as e:
         logger.exception("Error preparing CloudDesigner images")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/all-statuses", response_model=AllContainerStatusResponse)
+async def get_all_statuses():
+    """
+    Get status of all CloudDesigner containers.
+
+    Returns status for each container: desktop, guacamole, guacd, nginx.
+    Useful for debugging when some containers fail to start.
+    """
+    try:
+        manager = get_clouddesigner_manager()
+        statuses = await asyncio.to_thread(manager.get_all_container_statuses)
+
+        return AllContainerStatusResponse(statuses=statuses)
+    except Exception as e:
+        logger.exception("Error getting all container statuses")
         raise HTTPException(status_code=500, detail=str(e))
 
 
