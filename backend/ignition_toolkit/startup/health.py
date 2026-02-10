@@ -75,10 +75,17 @@ class SystemHealth:
 
     def to_dict(self) -> dict:
         """Convert to JSON-serializable dict for API responses"""
+        # Calculate uptime from startup_time
+        uptime_seconds = 0.0
+        if self.startup_time:
+            uptime_seconds = (datetime.now(UTC) - self.startup_time).total_seconds()
+
         return {
+            "status": self.overall.value,
             "overall": self.overall.value,
             "ready": self.ready,
             "startup_time": self.startup_time.isoformat() if self.startup_time else None,
+            "uptime_seconds": uptime_seconds,
             "components": {
                 "database": self.database.to_dict(),
                 "vault": self.vault.to_dict(),

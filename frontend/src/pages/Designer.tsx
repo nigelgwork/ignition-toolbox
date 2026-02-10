@@ -441,9 +441,35 @@ docker info`}
 
             {/* Container status error (from polling) */}
             {!startError && containerStatus?.error && !isRunning && (
-              <Alert severity="warning" sx={{ mb: 2 }}>
+              <Alert
+                severity="warning"
+                sx={{ mb: 2 }}
+                action={
+                  (containerStatus.status === 'restarting' || containerStatus.status === 'exited' || containerStatus.status === 'created') ? (
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        color="inherit"
+                        size="small"
+                        onClick={() => stopMutation.mutate()}
+                        disabled={isStopping}
+                        startIcon={<StopIcon />}
+                      >
+                        {isStopping ? 'Stopping...' : 'Stop'}
+                      </Button>
+                      <Button
+                        color="inherit"
+                        size="small"
+                        onClick={() => setShowCleanupConfirm(true)}
+                        startIcon={<CleanupIcon />}
+                      >
+                        Cleanup
+                      </Button>
+                    </Stack>
+                  ) : undefined
+                }
+              >
                 {containerStatus.status === 'restarting'
-                  ? 'Container is crash-looping. Check Docker logs for details.'
+                  ? 'Container is crash-looping. Stop or cleanup the containers to resolve.'
                   : containerStatus.error}
               </Alert>
             )}

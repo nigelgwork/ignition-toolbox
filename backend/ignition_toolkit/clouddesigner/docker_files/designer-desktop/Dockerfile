@@ -87,7 +87,9 @@ RUN useradd -m -s /bin/bash -G sudo designer \
 # ============================================
 COPY scripts/configure-vnc.sh /usr/local/bin/
 COPY scripts/xstartup /usr/local/share/xstartup
-RUN chmod 755 /usr/local/bin/configure-vnc.sh \
+# Fix potential CRLF line endings from Windows git checkout
+RUN sed -i 's/\r$//' /usr/local/bin/configure-vnc.sh /usr/local/share/xstartup \
+    && chmod 755 /usr/local/bin/configure-vnc.sh \
     && chmod 755 /usr/local/share/xstartup
 
 # ============================================
@@ -111,7 +113,9 @@ COPY scripts/launch-designer.sh /usr/local/bin/
 COPY scripts/start-desktop.sh /usr/local/bin/
 COPY scripts/gateway-selector.sh /usr/local/bin/
 COPY scripts/automate-designer-login.sh /usr/local/bin/
-RUN chmod 755 /usr/local/bin/*.sh
+# Fix Windows CRLF line endings that break shell script execution in Linux containers
+# This can happen when Docker builds on Windows where git autocrlf converts LF to CRLF
+RUN sed -i 's/\r$//' /usr/local/bin/*.sh && chmod 755 /usr/local/bin/*.sh
 
 # ============================================
 # Install Designer Launcher (template for copying to user home)
@@ -127,6 +131,7 @@ RUN cd /tmp && tar -xzf designerlauncher.tar.gz && \
 # Supervisor Configuration
 # ============================================
 COPY config/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+RUN sed -i 's/\r$//' /etc/supervisor/conf.d/supervisord.conf
 
 # ============================================
 # Desktop Shortcuts

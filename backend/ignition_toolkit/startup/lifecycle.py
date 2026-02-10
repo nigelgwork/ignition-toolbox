@@ -100,18 +100,24 @@ async def lifespan(app: FastAPI):
         # Browsers should be bundled with the installer - just verify they exist
         logger.info("Phase 5/8: Playwright Browser Check")
         try:
-            from ignition_toolkit.startup.playwright_installer import is_browser_installed
-            import os
+            from ignition_toolkit.startup.playwright_installer import (
+                is_browser_installed,
+                get_playwright_browsers_path,
+            )
 
-            browsers_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "default")
+            browsers_path = get_playwright_browsers_path()
             logger.info(f"Checking for browsers at: {browsers_path}")
+            logger.info(f"  Path exists: {browsers_path.exists()}")
+            if browsers_path.exists():
+                contents = list(browsers_path.iterdir())
+                logger.info(f"  Contents: {[p.name for p in contents]}")
 
             if is_browser_installed():
                 set_component_healthy("browser", "Chromium browser ready")
                 logger.info("[OK] Playwright browser ready")
             else:
                 # Browser not found - this shouldn't happen with bundled installer
-                set_component_degraded("browser", "Browser not found - playbooks may not work")
+                set_component_degraded("browser", f"Browser not found at {browsers_path}")
                 logger.warning("[WARN]  Playwright browser not found. Playbooks requiring a browser will fail.")
                 logger.warning(f"   Expected browser location: {browsers_path}")
         except Exception as e:
@@ -119,7 +125,12 @@ async def lifespan(app: FastAPI):
             set_component_degraded("browser", str(e))
 
         # Phase 6: Frontend Build (NON-FATAL, production only)
-        if not is_dev_mode():
+        # In frozen mode (PyInstaller), Electron serves the frontend - skip validation
+        from ignition_toolkit.core.paths import is_frozen
+        if is_frozen():
+            logger.info("Phase 6/8: Frontend Validation (SKIPPED - Electron serves frontend)")
+            set_component_healthy("frontend", "Electron serves frontend")
+        elif not is_dev_mode():
             logger.info("Phase 6/8: Frontend Validation")
             try:
                 await validate_frontend()
