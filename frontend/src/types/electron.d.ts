@@ -24,6 +24,7 @@ interface ElectronAPI {
   // Backend communication
   getBackendUrl: () => Promise<string>;
   getWebSocketUrl: () => Promise<string>;
+  getWebSocketApiKey: () => Promise<string>;
   getBackendStatus: () => Promise<{ running: boolean; port: number | null }>;
   restartBackend: () => Promise<void>;
 

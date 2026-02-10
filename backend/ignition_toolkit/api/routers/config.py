@@ -9,6 +9,7 @@ import logging
 import os
 from fastapi import APIRouter
 
+from ignition_toolkit.core.config import get_settings
 from ignition_toolkit.core.paths import (
     get_playbooks_dir,
     get_package_root,
@@ -38,6 +39,8 @@ async def get_config():
     # Check if AI is enabled
     ai_enabled = bool(os.getenv("ANTHROPIC_API_KEY"))
 
+    settings = get_settings()
+
     return {
         "version": version,
         "paths": {
@@ -53,5 +56,6 @@ async def get_config():
         "server": {
             "port": int(os.getenv("API_PORT", "5000")),
             "host": os.getenv("API_HOST", "0.0.0.0"),
-        }
+        },
+        "websocket_api_key": settings.websocket_api_key,
     }

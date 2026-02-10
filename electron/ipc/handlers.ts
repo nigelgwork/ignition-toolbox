@@ -28,6 +28,10 @@ export function registerIpcHandlers(pythonBackend: PythonBackend): void {
     return pythonBackend.getWebSocketUrl();
   });
 
+  ipcMain.handle('app:getWebSocketApiKey', () => {
+    return pythonBackend.getWebSocketApiKey();
+  });
+
   ipcMain.handle('app:getBackendStatus', () => {
     return pythonBackend.getStatus();
   });

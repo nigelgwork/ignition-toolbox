@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Backend communication
   getBackendUrl: (): Promise<string> => ipcRenderer.invoke('app:getBackendUrl'),
   getWebSocketUrl: (): Promise<string> => ipcRenderer.invoke('app:getWebSocketUrl'),
+  getWebSocketApiKey: (): Promise<string> => ipcRenderer.invoke('app:getWebSocketApiKey'),
   getBackendStatus: (): Promise<{ running: boolean; port: number | null }> =>
     ipcRenderer.invoke('app:getBackendStatus'),
   restartBackend: (): Promise<void> => ipcRenderer.invoke('app:restartBackend'),
@@ -107,6 +108,7 @@ declare global {
       getPlatform: () => string;
       getBackendUrl: () => Promise<string>;
       getWebSocketUrl: () => Promise<string>;
+      getWebSocketApiKey: () => Promise<string>;
       getBackendStatus: () => Promise<{ running: boolean; port: number | null }>;
       restartBackend: () => Promise<void>;
       openFileDialog: (options: {

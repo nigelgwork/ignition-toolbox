@@ -13,11 +13,11 @@ const logger = createLogger('WebSocket');
 // In Electron: constructed from IPC-provided backend URL
 // In browser: use window.location
 let WS_URL = import.meta.env.VITE_WS_URL || 'ws://127.0.0.1:5000/ws/executions';
-const WS_API_KEY = import.meta.env.VITE_WS_API_KEY || 'dev-key-change-in-production';
+let WS_API_KEY = import.meta.env.VITE_WS_API_KEY || '';
 let _wsInitialized = false;
 let _wsInitPromise: Promise<void> | null = null;
 
-// Initialize Electron WebSocket URL if available
+// Initialize Electron WebSocket URL and API key
 export async function initializeWebSocketUrl(): Promise<void> {
   if (_wsInitialized) return;
 
@@ -28,12 +28,36 @@ export async function initializeWebSocketUrl(): Promise<void> {
       logger.info('Using Electron WebSocket URL:', WS_URL);
     } catch (error) {
       logger.error('Failed to get Electron WebSocket URL:', error);
-      // Fallback to default
       WS_URL = 'ws://127.0.0.1:5000/ws/executions';
     }
+
+    // Fetch API key from Electron
+    if (window.electronAPI.getWebSocketApiKey) {
+      try {
+        WS_API_KEY = await window.electronAPI.getWebSocketApiKey();
+        logger.info('WebSocket API key received from Electron');
+      } catch (error) {
+        logger.error('Failed to get WebSocket API key:', error);
+      }
+    }
   } else if (window.location.protocol !== 'file:') {
-    // Web mode - use current location
+    // Web mode - use current location for URL
     WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/executions`;
+
+    // Fetch API key from backend config endpoint
+    try {
+      const baseUrl = `${window.location.protocol}//${window.location.host}`;
+      const response = await fetch(`${baseUrl}/api/config`);
+      if (response.ok) {
+        const config = await response.json();
+        if (config.websocket_api_key) {
+          WS_API_KEY = config.websocket_api_key;
+          logger.info('WebSocket API key received from config endpoint');
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to fetch WebSocket API key from config:', error);
+    }
   }
 
   _wsInitialized = true;

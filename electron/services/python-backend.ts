@@ -1,6 +1,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import { app } from 'electron';
 import * as http from 'http';
 
@@ -24,6 +25,7 @@ export type BackendCrashCallback = (crashInfo: BackendCrashInfo) => void;
 export class PythonBackend {
   private process: ChildProcess | null = null;
   private port: number | null = null;
+  private wsApiKey: string = '';
   private healthCheckInterval: NodeJS.Timeout | null = null;
   private restartCount = 0;
   private maxRestarts = 3;
@@ -165,6 +167,7 @@ export class PythonBackend {
 
     this.isShuttingDown = false;
     this.port = await this.findFreePort();
+    this.wsApiKey = crypto.randomBytes(32).toString('base64url');
 
     const useFrozen = this.useFrozenExecutable();
     let executable: string;
@@ -244,6 +247,7 @@ export class PythonBackend {
       ...process.env,
       IGNITION_TOOLKIT_PORT: String(this.port),
       IGNITION_TOOLKIT_HOST: '127.0.0.1',
+      WEBSOCKET_API_KEY: this.wsApiKey,
       PYTHONUNBUFFERED: '1',
       // Use app data directory for toolkit data
       IGNITION_TOOLKIT_DATA: path.join(app.getPath('userData'), 'toolkit-data'),
@@ -489,5 +493,12 @@ export class PythonBackend {
    */
   getWebSocketUrl(): string {
     return `ws://127.0.0.1:${this.port}`;
+  }
+
+  /**
+   * Get the WebSocket API key for authentication
+   */
+  getWebSocketApiKey(): string {
+    return this.wsApiKey;
   }
 }
