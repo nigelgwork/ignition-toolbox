@@ -16,7 +16,7 @@ import yaml
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ignition_toolkit.core.paths import get_playbooks_dir
+from ignition_toolkit.core.paths import get_playbooks_dir, get_all_playbook_dirs
 from ignition_toolkit.playbook.loader import PlaybookLoader
 
 logger = logging.getLogger(__name__)
@@ -61,9 +61,22 @@ def get_metadata_store():
     return metadata_store
 
 
+def _get_relative_to_any_playbook_dir(full_path: Path) -> str:
+    """Get relative path from whichever playbook directory contains this path."""
+    resolved = full_path.resolve()
+    for playbook_dir in get_all_playbook_dirs():
+        try:
+            return str(resolved.relative_to(playbook_dir.resolve()))
+        except ValueError:
+            continue
+    # Fallback to built-in dir (original behavior)
+    return str(resolved.relative_to(get_playbooks_dir().resolve()))
+
+
 def validate_playbook_path(path_str: str) -> Path:
     """
-    Validate playbook path to prevent directory traversal attacks
+    Validate playbook path to prevent directory traversal attacks.
+    Searches across all playbook directories (user first, then built-in).
 
     Args:
         path_str: User-provided playbook path
@@ -76,16 +89,23 @@ def validate_playbook_path(path_str: str) -> Path:
     """
     from ignition_toolkit.core.validation import PathValidator
 
-    return PathValidator.validate_playbook_path(
-        path_str,
-        base_dir=get_playbooks_dir(),
-        must_exist=True
-    )
+    for playbook_dir in get_all_playbook_dirs():
+        try:
+            return PathValidator.validate_playbook_path(
+                path_str,
+                base_dir=playbook_dir,
+                must_exist=True
+            )
+        except HTTPException:
+            continue
+
+    raise HTTPException(status_code=404, detail=f"Playbook file not found: {path_str}")
 
 
 def get_relative_playbook_path(path_str: str) -> str:
     """
-    Convert a playbook path (full or relative) to a relative path from playbooks directory
+    Convert a playbook path (full or relative) to a relative path from playbooks directory.
+    Searches across all playbook directories (user first, then built-in).
 
     Args:
         path_str: User-provided playbook path (can be full or relative)
@@ -95,23 +115,25 @@ def get_relative_playbook_path(path_str: str) -> str:
     """
     from ignition_toolkit.core.validation import PathValidator
 
-    playbooks_dir = get_playbooks_dir().resolve()
+    for playbook_dir in get_all_playbook_dirs():
+        try:
+            resolved_dir = playbook_dir.resolve()
+            validated_path = PathValidator.validate_playbook_path(
+                path_str,
+                base_dir=resolved_dir,
+                must_exist=False
+            )
+            relative_path = validated_path.relative_to(resolved_dir)
+            return str(relative_path)
+        except HTTPException:
+            continue
 
-    try:
-        validated_path = PathValidator.validate_playbook_path(
-            path_str,
-            base_dir=playbooks_dir,
-            must_exist=False  # Metadata operations might reference deleted playbooks
-        )
-        relative_path = validated_path.relative_to(playbooks_dir)
-        return str(relative_path)
-    except HTTPException:
-        if ".." not in path_str and not Path(path_str).is_absolute():
-            return path_str
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid playbook path - must be relative path within playbooks directory"
-        )
+    if ".." not in path_str and not Path(path_str).is_absolute():
+        return path_str
+    raise HTTPException(
+        status_code=400,
+        detail="Invalid playbook path - must be relative path within playbooks directory"
+    )
 
 
 # ============================================================================
@@ -124,13 +146,7 @@ async def delete_playbook(playbook_path: str):
     """Delete a playbook file and its metadata"""
     metadata_store = get_metadata_store()
     try:
-        from ignition_toolkit.core.validation import PathValidator
-
-        full_path = PathValidator.validate_playbook_path(
-            playbook_path,
-            base_dir=get_playbooks_dir(),
-            must_exist=True
-        )
+        full_path = validate_playbook_path(playbook_path)
 
         if not full_path.is_file():
             raise HTTPException(status_code=400, detail=f"Path is not a file: {playbook_path}")
@@ -176,13 +192,7 @@ async def duplicate_playbook(playbook_path: str, new_name: str | None = None):
     metadata_store = get_metadata_store()
 
     try:
-        from ignition_toolkit.core.validation import PathValidator
-
-        source_path = PathValidator.validate_playbook_path(
-            playbook_path,
-            base_dir=get_playbooks_dir(),
-            must_exist=True
-        )
+        source_path = validate_playbook_path(playbook_path)
 
         if not source_path.is_file():
             raise HTTPException(status_code=400, detail=f"Source is not a file: {playbook_path}")
@@ -213,9 +223,8 @@ async def duplicate_playbook(playbook_path: str, new_name: str | None = None):
         shutil.copy2(source_path, new_path)
         logger.info(f"Duplicated playbook: {source_path} -> {new_path}")
 
-        playbooks_dir = get_playbooks_dir()
-        source_relative = str(source_path.relative_to(playbooks_dir))
-        new_relative = str(new_path.relative_to(playbooks_dir))
+        source_relative = _get_relative_to_any_playbook_dir(source_path)
+        new_relative = _get_relative_to_any_playbook_dir(new_path)
 
         metadata_store.mark_as_duplicated(new_relative, source_relative)
         logger.info(f"Marked {new_relative} as duplicated from {source_relative}")
@@ -262,8 +271,7 @@ async def export_playbook(playbook_path: str):
         with open(validated_path, encoding='utf-8') as f:
             yaml_content = f.read()
 
-        playbooks_dir = get_playbooks_dir()
-        relative_path = str(validated_path.relative_to(playbooks_dir))
+        relative_path = _get_relative_to_any_playbook_dir(validated_path)
         metadata_store = get_metadata_store()
         meta = metadata_store.get_metadata(relative_path)
 

@@ -39,25 +39,28 @@ def get_relative_playbook_path(path_str: str) -> str:
     """
     from pathlib import Path
     from ignition_toolkit.core.validation import PathValidator
-    from ignition_toolkit.core.paths import get_playbooks_dir
+    from ignition_toolkit.core.paths import get_all_playbook_dirs
 
-    playbooks_dir = get_playbooks_dir().resolve()
+    # Search all playbook directories (user first, then built-in)
+    for playbook_dir in get_all_playbook_dirs():
+        try:
+            validated_path = PathValidator.validate_playbook_path(
+                path_str,
+                base_dir=playbook_dir.resolve(),
+                must_exist=False  # Metadata operations might reference deleted playbooks
+            )
+            relative_path = validated_path.relative_to(playbook_dir.resolve())
+            return str(relative_path)
+        except HTTPException:
+            continue
 
-    try:
-        validated_path = PathValidator.validate_playbook_path(
-            path_str,
-            base_dir=playbooks_dir,
-            must_exist=False  # Metadata operations might reference deleted playbooks
-        )
-        relative_path = validated_path.relative_to(playbooks_dir)
-        return str(relative_path)
-    except HTTPException:
-        if ".." not in path_str and not Path(path_str).is_absolute():
-            return path_str
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid playbook path - must be relative path within playbooks directory"
-        )
+    # Fallback: if path looks safe, return as-is (for deleted playbooks)
+    if ".." not in path_str and not Path(path_str).is_absolute():
+        return path_str
+    raise HTTPException(
+        status_code=400,
+        detail="Invalid playbook path - must be relative path within playbooks directory"
+    )
 
 
 # ============================================================================

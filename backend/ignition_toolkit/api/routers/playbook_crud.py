@@ -129,11 +129,24 @@ def get_metadata_store():
     return metadata_store
 
 
+def _get_relative_to_any_playbook_dir(full_path: Path) -> str:
+    """Get relative path from whichever playbook directory contains this path."""
+    resolved = full_path.resolve()
+    for playbook_dir in get_all_playbook_dirs():
+        try:
+            return str(resolved.relative_to(playbook_dir.resolve()))
+        except ValueError:
+            continue
+    # Fallback to built-in dir (original behavior)
+    return str(resolved.relative_to(get_playbooks_dir().resolve()))
+
+
 def validate_playbook_path(path_str: str) -> Path:
     """
     Validate playbook path to prevent directory traversal attacks
 
     SECURITY: This is a wrapper around PathValidator for backwards compatibility.
+    Searches across all playbook directories (user first, then built-in).
 
     Args:
         path_str: User-provided playbook path
@@ -146,11 +159,19 @@ def validate_playbook_path(path_str: str) -> Path:
     """
     from ignition_toolkit.core.validation import PathValidator
 
-    return PathValidator.validate_playbook_path(
-        path_str,
-        base_dir=get_playbooks_dir(),
-        must_exist=True
-    )
+    # Search all playbook directories (user dir first, then built-in)
+    for playbook_dir in get_all_playbook_dirs():
+        try:
+            return PathValidator.validate_playbook_path(
+                path_str,
+                base_dir=playbook_dir,
+                must_exist=True
+            )
+        except HTTPException:
+            continue
+
+    # If not found in any directory, raise 404
+    raise HTTPException(status_code=404, detail=f"Playbook file not found: {path_str}")
 
 
 # ============================================================================
@@ -304,8 +325,7 @@ async def get_playbook(playbook_path: str):
             for s in playbook.steps
         ]
 
-        playbooks_dir = get_playbooks_dir()
-        relative_path = str(validated_path.relative_to(playbooks_dir))
+        relative_path = _get_relative_to_any_playbook_dir(validated_path)
         meta = metadata_store.get_metadata(relative_path)
 
         return PlaybookInfo(
@@ -344,20 +364,7 @@ async def update_playbook(request: PlaybookUpdateRequest):
     """
     metadata_store = get_metadata_store()
     try:
-        playbooks_dir = get_playbooks_dir()
-        playbook_path = playbooks_dir / request.playbook_path
-
-        # Security check: ensure path is within playbooks directory
-        try:
-            playbook_path = playbook_path.resolve()
-            playbooks_dir_resolved = playbooks_dir.resolve()
-            # Use relative_to() for safe path validation instead of string comparison
-            playbook_path.relative_to(playbooks_dir_resolved)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid playbook path")
-
-        if not playbook_path.exists():
-            raise HTTPException(status_code=404, detail="Playbook not found")
+        playbook_path = validate_playbook_path(request.playbook_path)
 
         backup_path = playbook_path.with_suffix(
             f".backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml"

@@ -173,7 +173,7 @@ def validate_and_resolve_playbook_path(playbook_relative_path_str: str) -> tuple
     Raises:
         HTTPException: If path is invalid or file not found
     """
-    from ignition_toolkit.core.paths import get_playbooks_dir
+    from ignition_toolkit.core.paths import get_all_playbook_dirs
 
     playbook_relative_path = Path(playbook_relative_path_str)
 
@@ -184,16 +184,15 @@ def validate_and_resolve_playbook_path(playbook_relative_path_str: str) -> tuple
             detail="Invalid playbook path - relative paths only, no directory traversal",
         )
 
-    # Resolve full path relative to playbooks directory
-    playbooks_dir = get_playbooks_dir()
-    playbook_path = playbooks_dir / playbook_relative_path
+    # Search all playbook directories (user first, then built-in)
+    for playbooks_dir in get_all_playbook_dirs():
+        playbook_path = playbooks_dir / playbook_relative_path
+        if playbook_path.exists():
+            return playbooks_dir, playbook_path
 
-    if not playbook_path.exists():
-        raise HTTPException(
-            status_code=404, detail=f"Playbook file not found: {playbook_relative_path_str}"
-        )
-
-    return playbooks_dir, playbook_path
+    raise HTTPException(
+        status_code=404, detail=f"Playbook file not found: {playbook_relative_path_str}"
+    )
 
 
 # ============================================================================
