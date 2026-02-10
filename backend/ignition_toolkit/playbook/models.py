@@ -52,6 +52,7 @@ class StepType(str, Enum):
     BROWSER_VERIFY_TEXT = "browser.verify_text"
     BROWSER_VERIFY_ATTRIBUTE = "browser.verify_attribute"
     BROWSER_VERIFY_STATE = "browser.verify_state"
+    BROWSER_GET_TEXT = "browser.get_text"
 
     # Designer operations (desktop application automation)
     DESIGNER_LAUNCH = "designer.launch"

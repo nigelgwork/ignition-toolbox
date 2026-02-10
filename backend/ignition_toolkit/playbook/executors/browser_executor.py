@@ -325,3 +325,34 @@ class BrowserVerifyStateHandler(StepHandler):
             if isinstance(e, StepExecutionError):
                 raise
             raise StepExecutionError("browser", f"State verification failed: {str(e)}")
+
+
+class BrowserGetTextHandler(StepHandler):
+    """Handle browser.get_text step - extract text content from an element"""
+
+    def __init__(self, manager: BrowserManager):
+        self.manager = manager
+
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+        selector = params.get("selector")
+        timeout = params.get("timeout", 30000)
+
+        try:
+            page = await self.manager.get_page()
+            element = await page.wait_for_selector(selector, timeout=timeout)
+            if not element:
+                raise StepExecutionError(
+                    "browser",
+                    f"Element not found: '{selector}'",
+                )
+
+            text = await element.text_content()
+            if text is None:
+                text = ""
+
+            return {"selector": selector, "text": text.strip(), "status": "extracted"}
+
+        except Exception as e:
+            if isinstance(e, StepExecutionError):
+                raise
+            raise StepExecutionError("browser", f"Text extraction failed: {str(e)}")

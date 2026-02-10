@@ -24,6 +24,7 @@ from ignition_toolkit.playbook.executors.browser_executor import (
     BrowserClickHandler,
     BrowserFillHandler,
     BrowserFileUploadHandler,
+    BrowserGetTextHandler,
     BrowserNavigateHandler,
     BrowserScreenshotHandler,
     BrowserVerifyHandler,
@@ -90,6 +91,7 @@ __all__ = [
     "BrowserVerifyTextHandler",
     "BrowserVerifyAttributeHandler",
     "BrowserVerifyStateHandler",
+    "BrowserGetTextHandler",
     # Designer
     "DesignerLaunchHandler",
     "DesignerLaunchShortcutHandler",
