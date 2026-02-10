@@ -6,6 +6,7 @@ managing API keys, and executing raw API requests.
 """
 
 import logging
+import time
 from typing import Any
 
 import httpx
@@ -167,6 +168,7 @@ async def _make_gateway_request(
     req_headers.setdefault("Accept", "application/json")
 
     try:
+        start = time.monotonic()
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, verify=False) as client:
             response = await client.request(
                 method=method.upper(),
@@ -203,11 +205,14 @@ async def _make_gateway_request(
             except (ValueError, TypeError):
                 body_data = response.text
 
+            elapsed_ms = round((time.monotonic() - start) * 1000, 1)
+
             return {
                 "status_code": response.status_code,
                 "headers": dict(response.headers),
                 "body": body_data,
                 "url": str(response.url),
+                "elapsed_ms": elapsed_ms,
             }
 
     except httpx.ConnectError as e:

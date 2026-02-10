@@ -35,6 +35,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Tooltip,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -57,6 +58,9 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type ApiKeyInfo } from '../api/client';
 import { ignitionApiDocs, type ApiEndpointDoc, type ApiCategoryDoc } from '../data/ignitionApiDocs';
+import { ResponseViewer } from '../components/api-explorer/ResponseViewer';
+import { EndpointDocPanel } from '../components/api-explorer/EndpointDocPanel';
+import { DocumentationCard } from '../components/api-explorer/DocumentationCard';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -160,79 +164,86 @@ function getMethodColor(method: string): string {
   }
 }
 
-/** Documentation tab content with search and OpenAPI support */
-function DocumentationTab({
-  selectedKeyInfo,
-  selectedKey,
-}: {
-  selectedKeyInfo: ApiKeyInfo | undefined;
-  selectedKey: string;
-}) {
-  const [searchQuery, setSearchQuery] = useState('');
+/** Parse OpenAPI spec into ApiCategoryDoc array */
+function parseOpenApiSpec(spec: { paths?: Record<string, unknown> } | null): ApiCategoryDoc[] | null {
+  if (!spec?.paths) return null;
 
-  // Try to fetch OpenAPI spec if a gateway is selected
-  const { data: openApiSpec, isLoading: openApiLoading } = useQuery({
-    queryKey: ['openapi-spec', selectedKey],
-    queryFn: () =>
-      api.apiExplorer.fetchOpenAPI({
-        gateway_url: selectedKeyInfo?.gateway_url || '',
-        api_key_name: selectedKey,
-      }),
-    enabled: !!selectedKey && !!selectedKeyInfo,
-    retry: false,
-  });
+  const tagMap = new Map<string, ApiEndpointDoc[]>();
 
-  // Parse OpenAPI spec into categories if available
-  const openApiCategories = useMemo(() => {
-    if (!openApiSpec?.paths) return null;
-
-    const tagMap = new Map<string, ApiEndpointDoc[]>();
-
-    for (const [path, methods] of Object.entries(openApiSpec.paths)) {
-      if (typeof methods !== 'object' || methods === null) continue;
-      for (const [method, details] of Object.entries(methods as Record<string, unknown>)) {
-        if (!['get', 'post', 'put', 'delete', 'patch'].includes(method)) continue;
-        const detail = details as {
-          tags?: string[];
-          summary?: string;
+  for (const [path, methods] of Object.entries(spec.paths)) {
+    if (typeof methods !== 'object' || methods === null) continue;
+    for (const [method, details] of Object.entries(methods as Record<string, unknown>)) {
+      if (!['get', 'post', 'put', 'delete', 'patch'].includes(method)) continue;
+      const detail = details as {
+        tags?: string[];
+        summary?: string;
+        description?: string;
+        parameters?: Array<{
+          name: string;
+          in: string;
           description?: string;
-          parameters?: Array<{
-            name: string;
-            in: string;
-            description?: string;
-            required?: boolean;
-            schema?: { type?: string };
-          }>;
-        };
-        const tags = detail.tags || ['Other'];
-        const endpoint: ApiEndpointDoc = {
-          method: method.toUpperCase(),
-          path,
-          description: detail.summary || detail.description || '',
-          parameters: detail.parameters?.map((p) => ({
-            name: p.name,
-            type: p.schema?.type || p.in,
-            description: p.description || '',
-            required: p.required,
-          })),
-        };
-        for (const tag of tags) {
-          if (!tagMap.has(tag)) tagMap.set(tag, []);
-          tagMap.get(tag)!.push(endpoint);
-        }
+          required?: boolean;
+          schema?: { type?: string };
+        }>;
+      };
+      const tags = detail.tags || ['Other'];
+      const endpoint: ApiEndpointDoc = {
+        method: method.toUpperCase(),
+        path,
+        description: detail.summary || detail.description || '',
+        parameters: detail.parameters?.map((p) => ({
+          name: p.name,
+          type: p.schema?.type || p.in,
+          description: p.description || '',
+          required: p.required,
+        })),
+      };
+      for (const tag of tags) {
+        if (!tagMap.has(tag)) tagMap.set(tag, []);
+        tagMap.get(tag)!.push(endpoint);
       }
     }
+  }
 
-    const categories: ApiCategoryDoc[] = [];
-    for (const [name, endpoints] of tagMap.entries()) {
-      categories.push({
-        name,
-        description: `Endpoints tagged "${name}" from gateway OpenAPI specification.`,
-        endpoints,
-      });
-    }
-    return categories.sort((a, b) => a.name.localeCompare(b.name));
-  }, [openApiSpec]);
+  const categories: ApiCategoryDoc[] = [];
+  for (const [name, endpoints] of tagMap.entries()) {
+    categories.push({
+      name,
+      description: `Endpoints tagged "${name}" from gateway OpenAPI specification.`,
+      endpoints,
+    });
+  }
+  return categories.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Endpoint tree child with optional description */
+interface EndpointChild {
+  path: string;
+  label: string;
+  method?: string;
+  description?: string;
+}
+
+interface EndpointSection {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  children: EndpointChild[];
+}
+
+/** Documentation tab content with search and OpenAPI support */
+function DocumentationTab({
+  openApiCategories,
+  openApiLoading,
+  selectedKey,
+  onTryThis,
+}: {
+  openApiCategories: ApiCategoryDoc[] | null;
+  openApiLoading: boolean;
+  selectedKey: string;
+  onTryThis: (method: string, path: string, body?: string) => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Use OpenAPI categories if available, otherwise static docs
   const docsSource = openApiCategories || ignitionApiDocs;
@@ -250,7 +261,9 @@ function DocumentationTab({
           (ep) =>
             ep.path.toLowerCase().includes(query) ||
             ep.description.toLowerCase().includes(query) ||
-            ep.method.toLowerCase().includes(query)
+            ep.method.toLowerCase().includes(query) ||
+            ep.parameters?.some((p) => p.name.toLowerCase().includes(query)) ||
+            ep.notes?.toLowerCase().includes(query)
         ),
       }))
       .filter((category) => category.endpoints.length > 0);
@@ -275,7 +288,7 @@ function DocumentationTab({
       <TextField
         size="small"
         fullWidth
-        placeholder="Search endpoints by path, description, or method..."
+        placeholder="Search by path, description, method, or parameter name..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         sx={{ mb: 2 }}
@@ -313,61 +326,14 @@ function DocumentationTab({
                 <Box
                   key={`${endpoint.method}-${endpoint.path}-${idx}`}
                   sx={{
-                    px: 2,
-                    py: 1.5,
                     borderTop: idx > 0 ? 1 : 0,
                     borderColor: 'divider',
-                    '&:hover': { bgcolor: 'action.hover' },
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                    <Chip
-                      label={endpoint.method}
-                      size="small"
-                      sx={{
-                        fontWeight: 'bold',
-                        fontFamily: 'monospace',
-                        bgcolor: getMethodColor(endpoint.method),
-                        color: '#fff',
-                        minWidth: 60,
-                      }}
-                    />
-                    <Typography
-                      variant="body2"
-                      fontFamily="monospace"
-                      sx={{ wordBreak: 'break-all' }}
-                    >
-                      {endpoint.path}
-                    </Typography>
-                  </Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>
-                    {endpoint.description}
-                  </Typography>
-                  {endpoint.parameters && endpoint.parameters.length > 0 && (
-                    <Box sx={{ mt: 1, ml: 1 }}>
-                      <Typography variant="caption" color="text.secondary" fontWeight="bold">
-                        Parameters:
-                      </Typography>
-                      {endpoint.parameters.map((param) => (
-                        <Box key={param.name} sx={{ display: 'flex', gap: 1, ml: 1, mt: 0.25 }}>
-                          <Typography variant="caption" fontFamily="monospace" color="primary.main">
-                            {param.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            ({param.type}){param.required ? ' *required' : ''}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            - {param.description}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  )}
-                  {endpoint.notes && (
-                    <Alert severity="info" variant="outlined" sx={{ mt: 1, py: 0 }}>
-                      <Typography variant="caption">{endpoint.notes}</Typography>
-                    </Alert>
-                  )}
+                  <DocumentationCard
+                    endpoint={endpoint}
+                    onTryThis={onTryThis}
+                  />
                 </Box>
               ))}
             </AccordionDetails>
@@ -440,6 +406,20 @@ export function APIExplorer() {
     enabled: !!selectedKey && !!selectedKeyInfo,
   });
 
+  // Fetch OpenAPI spec (lifted to parent so both Request Builder and Docs tab can use it)
+  const { data: openApiSpec, isLoading: openApiLoading } = useQuery({
+    queryKey: ['openapi-spec', selectedKey],
+    queryFn: () =>
+      api.apiExplorer.fetchOpenAPI({
+        gateway_url: selectedKeyInfo?.gateway_url || '',
+        api_key_name: selectedKey,
+      }),
+    enabled: !!selectedKey && !!selectedKeyInfo,
+    retry: false,
+  });
+
+  const openApiCategories = useMemo(() => parseOpenApiSpec(openApiSpec ?? null), [openApiSpec]);
+
   // Test connection mutation
   const testConnectionMutation = useMutation({
     mutationFn: () =>
@@ -486,17 +466,25 @@ export function APIExplorer() {
     );
   };
 
-  const endpoints = [
+  /** Navigate to Request Builder with pre-filled values */
+  const handleTryThis = (method: string, path: string, body?: string) => {
+    setRequestMethod(method);
+    setRequestPath(path);
+    if (body) setRequestBody(body);
+    setTabValue(2);
+  };
+
+  const endpoints: EndpointSection[] = [
     {
       id: 'gateway',
       label: 'Gateway',
       icon: <InfoIcon />,
       children: [
-        { path: '/data/api/v1/gateway-info', label: 'Gateway Info' },
-        { path: '/data/api/v1/overview', label: 'Overview' },
-        { path: '/data/api/v1/licenses', label: 'Licenses' },
-        { path: '/data/api/v1/trial', label: 'Trial Status' },
-        { path: '/data/api/v1/designers', label: 'Connected Designers' },
+        { path: '/data/api/v1/gateway-info', label: 'Gateway Info', method: 'GET', description: 'System version, edition, and platform details' },
+        { path: '/data/api/v1/overview', label: 'Overview', method: 'GET', description: 'Connection counts and active problems' },
+        { path: '/data/api/v1/licenses', label: 'Licenses', method: 'GET', description: 'License and module license info' },
+        { path: '/data/api/v1/trial', label: 'Trial Status', method: 'GET', description: 'Remaining trial time' },
+        { path: '/data/api/v1/designers', label: 'Connected Designers', method: 'GET', description: 'Active Designer sessions' },
       ],
     },
     {
@@ -504,8 +492,8 @@ export function APIExplorer() {
       label: 'Modules',
       icon: <ModulesIcon />,
       children: [
-        { path: '/data/api/v1/modules/healthy', label: 'Module Health' },
-        { path: '/data/api/v1/modules/quarantined', label: 'Quarantined' },
+        { path: '/data/api/v1/modules/healthy', label: 'Module Health', method: 'GET', description: 'Module health status and details' },
+        { path: '/data/api/v1/modules/quarantined', label: 'Quarantined', method: 'GET', description: 'Disabled modules due to errors' },
       ],
     },
     {
@@ -513,8 +501,8 @@ export function APIExplorer() {
       label: 'Projects',
       icon: <ProjectsIcon />,
       children: [
-        { path: '/data/api/v1/projects/list', label: 'List Projects' },
-        { path: '/data/api/v1/projects/names', label: 'Project Names' },
+        { path: '/data/api/v1/projects/list', label: 'List Projects', method: 'GET', description: 'All projects with metadata' },
+        { path: '/data/api/v1/projects/names', label: 'Project Names', method: 'GET', description: 'Simple name list' },
       ],
     },
     {
@@ -522,16 +510,16 @@ export function APIExplorer() {
       label: 'Resources',
       icon: <ResourcesIcon />,
       children: [
-        { path: '/data/api/v1/resources/list/ignition/database-connection', label: 'Database Connections' },
-        { path: '/data/api/v1/resources/list/ignition/tag-provider', label: 'Tag Providers' },
-        { path: '/data/api/v1/resources/list/ignition/opc-connection', label: 'OPC Connections' },
-        { path: '/data/api/v1/resources/list/com.inductiveautomation.opcua/device', label: 'OPC UA Devices' },
-        { path: '/data/api/v1/resources/list/ignition/user-source', label: 'User Sources' },
-        { path: '/data/api/v1/resources/list/ignition/schedule', label: 'Schedules' },
-        { path: '/data/api/v1/resources/list/ignition/alarm-journal', label: 'Alarm Journals' },
-        { path: '/data/api/v1/resources/list/ignition/email-profile', label: 'Email Profiles' },
-        { path: '/data/api/v1/resources/list/ignition/identity-provider', label: 'Identity Providers' },
-        { path: '/data/api/v1/resources/list/ignition/api-token', label: 'API Tokens' },
+        { path: '/data/api/v1/resources/list/ignition/database-connection', label: 'Database Connections', method: 'GET', description: 'Configured database connections' },
+        { path: '/data/api/v1/resources/list/ignition/tag-provider', label: 'Tag Providers', method: 'GET', description: 'Tag provider configurations' },
+        { path: '/data/api/v1/resources/list/ignition/opc-connection', label: 'OPC Connections', method: 'GET', description: 'OPC server connections' },
+        { path: '/data/api/v1/resources/list/com.inductiveautomation.opcua/device', label: 'OPC UA Devices', method: 'GET', description: 'OPC UA device connections' },
+        { path: '/data/api/v1/resources/list/ignition/user-source', label: 'User Sources', method: 'GET', description: 'Authentication profiles' },
+        { path: '/data/api/v1/resources/list/ignition/schedule', label: 'Schedules', method: 'GET', description: 'Configured schedules' },
+        { path: '/data/api/v1/resources/list/ignition/alarm-journal', label: 'Alarm Journals', method: 'GET', description: 'Alarm journal configurations' },
+        { path: '/data/api/v1/resources/list/ignition/email-profile', label: 'Email Profiles', method: 'GET', description: 'Email notification profiles' },
+        { path: '/data/api/v1/resources/list/ignition/identity-provider', label: 'Identity Providers', method: 'GET', description: 'Identity provider configurations' },
+        { path: '/data/api/v1/resources/list/ignition/api-token', label: 'API Tokens', method: 'GET', description: 'Configured API tokens' },
       ],
     },
     {
@@ -539,9 +527,9 @@ export function APIExplorer() {
       label: 'Perspective',
       icon: <PerspectiveIcon />,
       children: [
-        { path: '/data/perspective/api/v1/sessions/', label: 'Sessions' },
-        { path: '/data/api/v1/resources/list/com.inductiveautomation.perspective/themes', label: 'Themes' },
-        { path: '/data/api/v1/resources/list/com.inductiveautomation.perspective/icons', label: 'Icons' },
+        { path: '/data/perspective/api/v1/sessions/', label: 'Sessions', method: 'GET', description: 'Active Perspective sessions' },
+        { path: '/data/api/v1/resources/list/com.inductiveautomation.perspective/themes', label: 'Themes', method: 'GET', description: 'Installed Perspective themes' },
+        { path: '/data/api/v1/resources/list/com.inductiveautomation.perspective/icons', label: 'Icons', method: 'GET', description: 'Installed icon libraries' },
       ],
     },
     {
@@ -549,9 +537,9 @@ export function APIExplorer() {
       label: 'Diagnostics',
       icon: <DiagnosticsIcon />,
       children: [
-        { path: '/data/api/v1/diagnostics/threads/threaddump', label: 'Thread Dump' },
-        { path: '/data/api/v1/diagnostics/threads/deadlocks', label: 'Deadlocks' },
-        { path: '/data/api/v1/logs', label: 'Logs' },
+        { path: '/data/api/v1/diagnostics/threads/threaddump', label: 'Thread Dump', method: 'GET', description: 'Full JVM thread dump' },
+        { path: '/data/api/v1/diagnostics/threads/deadlocks', label: 'Deadlocks', method: 'GET', description: 'Deadlocked thread detection' },
+        { path: '/data/api/v1/logs', label: 'Logs', method: 'GET', description: 'Gateway log entries' },
       ],
     },
     {
@@ -559,9 +547,9 @@ export function APIExplorer() {
       label: 'Performance',
       icon: <PerfIcon />,
       children: [
-        { path: '/data/api/v1/systemPerformance/charts', label: 'Charts' },
-        { path: '/data/api/v1/systemPerformance/currentGauges', label: 'Current Gauges' },
-        { path: '/data/api/v1/systemPerformance/threads', label: 'Threads' },
+        { path: '/data/api/v1/systemPerformance/charts', label: 'Charts', method: 'GET', description: 'CPU, memory, disk usage over time' },
+        { path: '/data/api/v1/systemPerformance/currentGauges', label: 'Current Gauges', method: 'GET', description: 'Current CPU %, memory %, disk %' },
+        { path: '/data/api/v1/systemPerformance/threads', label: 'Threads', method: 'GET', description: 'Thread pool metrics' },
       ],
     },
   ];
@@ -584,18 +572,44 @@ export function APIExplorer() {
                 {expandedEndpoints.includes(section.id) ? <ExpandIcon /> : <ChevronIcon />}
               </ListItemButton>
               <Collapse in={expandedEndpoints.includes(section.id)}>
-                <List dense sx={{ pl: 4 }}>
+                <List dense sx={{ pl: 2 }}>
                   {section.children.map((child) => (
-                    <ListItemButton
+                    <Tooltip
                       key={child.path}
-                      onClick={() => {
-                        setRequestPath(child.path);
-                        setRequestMethod('GET');
-                        setTabValue(2);
-                      }}
+                      title={child.description || ''}
+                      placement="right"
+                      arrow
                     >
-                      <ListItemText primary={child.label} />
-                    </ListItemButton>
+                      <ListItemButton
+                        selected={requestPath === child.path}
+                        onClick={() => {
+                          setRequestPath(child.path);
+                          setRequestMethod(child.method || 'GET');
+                          setTabValue(2);
+                        }}
+                        sx={{
+                          borderRadius: 1,
+                          '&.Mui-selected': {
+                            bgcolor: 'action.selected',
+                          },
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            bgcolor: getMethodColor(child.method || 'GET'),
+                            mr: 1,
+                            flexShrink: 0,
+                          }}
+                        />
+                        <ListItemText
+                          primary={child.label}
+                          primaryTypographyProps={{ variant: 'body2' }}
+                        />
+                      </ListItemButton>
+                    </Tooltip>
                   ))}
                 </List>
               </Collapse>
@@ -844,6 +858,15 @@ export function APIExplorer() {
           {/* Request Builder Tab */}
           <TabPanel value={tabValue} index={2}>
             <Box sx={{ p: 2 }}>
+              {/* Contextual endpoint documentation */}
+              <EndpointDocPanel
+                method={requestMethod}
+                path={requestPath}
+                staticDocs={ignitionApiDocs}
+                openApiDocs={openApiCategories}
+                onTryExample={(body) => setRequestBody(body)}
+              />
+
               <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
                 <FormControl size="small" sx={{ minWidth: 100 }}>
                   <Select
@@ -892,24 +915,15 @@ export function APIExplorer() {
               )}
 
               {requestResponse && (
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Response
-                  </Typography>
-                  <Paper
-                    variant="outlined"
-                    sx={{
-                      p: 2,
-                      bgcolor: 'background.default',
-                      maxHeight: 400,
-                      overflow: 'auto',
-                    }}
-                  >
-                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                      {JSON.stringify(requestResponse, null, 2)}
-                    </pre>
-                  </Paper>
-                </Box>
+                <ResponseViewer
+                  response={requestResponse as {
+                    status_code: number;
+                    headers?: Record<string, string>;
+                    body: unknown;
+                    url?: string;
+                    elapsed_ms?: number;
+                  }}
+                />
               )}
             </Box>
           </TabPanel>
@@ -917,8 +931,10 @@ export function APIExplorer() {
           {/* Documentation Tab */}
           <TabPanel value={tabValue} index={3}>
             <DocumentationTab
-              selectedKeyInfo={selectedKeyInfo}
+              openApiCategories={openApiCategories}
+              openApiLoading={openApiLoading}
               selectedKey={selectedKey}
+              onTryThis={handleTryThis}
             />
           </TabPanel>
         </Paper>

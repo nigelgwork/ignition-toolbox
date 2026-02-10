@@ -11,6 +11,7 @@ export interface ApiEndpointDoc {
   description: string;
   parameters?: { name: string; type: string; description: string; required?: boolean }[];
   notes?: string;
+  example?: { body?: Record<string, unknown>; description?: string };
 }
 
 export interface ApiCategoryDoc {
@@ -44,6 +45,10 @@ export const ignitionApiDocs: ApiCategoryDoc[] = [
           { name: 'includeHistory', type: 'boolean', description: 'Include historical data in the backup.', required: false },
         ],
         notes: 'This operation can take significant time depending on gateway size.',
+        example: {
+          body: { includeProjects: true, includeHistory: false },
+          description: 'Create a backup with projects but without historical data.',
+        },
       },
       {
         method: 'GET',
@@ -54,6 +59,11 @@ export const ignitionApiDocs: ApiCategoryDoc[] = [
         method: 'GET',
         path: '/data/api/v1/trial',
         description: 'Get trial status information including remaining trial time.',
+      },
+      {
+        method: 'GET',
+        path: '/data/api/v1/designers',
+        description: 'List currently connected Designer sessions with user and project details.',
       },
     ],
   },
@@ -107,11 +117,6 @@ export const ignitionApiDocs: ApiCategoryDoc[] = [
         method: 'GET',
         path: '/data/api/v1/projects/names',
         description: 'Get a simple list of project names without additional metadata.',
-      },
-      {
-        method: 'GET',
-        path: '/data/api/v1/designers',
-        description: 'List currently connected Designer sessions.',
       },
       {
         method: 'POST',
@@ -208,6 +213,27 @@ export const ignitionApiDocs: ApiCategoryDoc[] = [
         method: 'GET',
         path: '/data/api/v1/systemPerformance/database',
         description: 'Get database connection pool performance statistics.',
+      },
+    ],
+  },
+  {
+    name: 'Perspective',
+    description: 'Perspective module session and resource endpoints.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/data/perspective/api/v1/sessions/',
+        description: 'List active Perspective sessions with page and user details.',
+      },
+      {
+        method: 'GET',
+        path: '/data/api/v1/resources/list/com.inductiveautomation.perspective/themes',
+        description: 'List installed Perspective themes.',
+      },
+      {
+        method: 'GET',
+        path: '/data/api/v1/resources/list/com.inductiveautomation.perspective/icons',
+        description: 'List installed Perspective icon libraries.',
       },
     ],
   },
