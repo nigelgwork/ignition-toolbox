@@ -42,6 +42,12 @@ import {
   Storage as DatabaseIcon,
   Info as InfoIcon,
   PlayArrow as ScanIcon,
+  Extension as ModulesIcon,
+  FolderOpen as ProjectsIcon,
+  Speed as PerfIcon,
+  SettingsInputComponent as ResourcesIcon,
+  Visibility as PerspectiveIcon,
+  BugReport as DiagnosticsIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type ApiKeyInfo } from '../api/client';
@@ -141,11 +147,11 @@ export function APIExplorer() {
   const [selectedKey, setSelectedKey] = useState<string>('');
   const [tabValue, setTabValue] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [expandedEndpoints, setExpandedEndpoints] = useState<string[]>(['resources']);
+  const [expandedEndpoints, setExpandedEndpoints] = useState<string[]>(['gateway']);
 
   // Request builder state
   const [requestMethod, setRequestMethod] = useState('GET');
-  const [requestPath, setRequestPath] = useState('/data/status/sys-info');
+  const [requestPath, setRequestPath] = useState('/data/api/v1/gateway-info');
   const [requestBody, setRequestBody] = useState('');
   const [requestResponse, setRequestResponse] = useState<Record<string, unknown> | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -239,25 +245,80 @@ export function APIExplorer() {
 
   const endpoints = [
     {
-      id: 'status',
-      label: 'Status',
+      id: 'gateway',
+      label: 'Gateway',
       icon: <InfoIcon />,
       children: [
-        { path: '/data/status/sys-info', label: 'System Info' },
-        { path: '/data/status/platform', label: 'Platform' },
-        { path: '/data/status/modules', label: 'Modules' },
-        { path: '/data/status/license', label: 'License' },
+        { path: '/data/api/v1/gateway-info', label: 'Gateway Info' },
+        { path: '/data/api/v1/overview', label: 'Overview' },
+        { path: '/data/api/v1/licenses', label: 'Licenses' },
+        { path: '/data/api/v1/trial', label: 'Trial Status' },
+        { path: '/data/api/v1/designers', label: 'Connected Designers' },
+      ],
+    },
+    {
+      id: 'modules',
+      label: 'Modules',
+      icon: <ModulesIcon />,
+      children: [
+        { path: '/data/api/v1/modules/healthy', label: 'Module Health' },
+        { path: '/data/api/v1/modules/quarantined', label: 'Quarantined' },
+      ],
+    },
+    {
+      id: 'projects',
+      label: 'Projects',
+      icon: <ProjectsIcon />,
+      children: [
+        { path: '/data/api/v1/projects/list', label: 'List Projects' },
+        { path: '/data/api/v1/projects/names', label: 'Project Names' },
       ],
     },
     {
       id: 'resources',
       label: 'Resources',
-      icon: <DatabaseIcon />,
+      icon: <ResourcesIcon />,
       children: [
-        { path: '/data/config/database-connections', label: 'Databases' },
-        { path: '/data/config/opc-connections', label: 'OPC Connections' },
-        { path: '/data/config/tag-providers', label: 'Tag Providers' },
-        { path: '/data/config/projects', label: 'Projects' },
+        { path: '/data/api/v1/resources/list/ignition/database-connection', label: 'Database Connections' },
+        { path: '/data/api/v1/resources/list/ignition/tag-provider', label: 'Tag Providers' },
+        { path: '/data/api/v1/resources/list/ignition/opc-connection', label: 'OPC Connections' },
+        { path: '/data/api/v1/resources/list/com.inductiveautomation.opcua/device', label: 'OPC UA Devices' },
+        { path: '/data/api/v1/resources/list/ignition/user-source', label: 'User Sources' },
+        { path: '/data/api/v1/resources/list/ignition/schedule', label: 'Schedules' },
+        { path: '/data/api/v1/resources/list/ignition/alarm-journal', label: 'Alarm Journals' },
+        { path: '/data/api/v1/resources/list/ignition/email-profile', label: 'Email Profiles' },
+        { path: '/data/api/v1/resources/list/ignition/identity-provider', label: 'Identity Providers' },
+        { path: '/data/api/v1/resources/list/ignition/api-token', label: 'API Tokens' },
+      ],
+    },
+    {
+      id: 'perspective',
+      label: 'Perspective',
+      icon: <PerspectiveIcon />,
+      children: [
+        { path: '/data/perspective/api/v1/sessions/', label: 'Sessions' },
+        { path: '/data/api/v1/resources/list/com.inductiveautomation.perspective/themes', label: 'Themes' },
+        { path: '/data/api/v1/resources/list/com.inductiveautomation.perspective/icons', label: 'Icons' },
+      ],
+    },
+    {
+      id: 'diagnostics',
+      label: 'Diagnostics',
+      icon: <DiagnosticsIcon />,
+      children: [
+        { path: '/data/api/v1/diagnostics/threads/threaddump', label: 'Thread Dump' },
+        { path: '/data/api/v1/diagnostics/threads/deadlocks', label: 'Deadlocks' },
+        { path: '/data/api/v1/logs', label: 'Logs' },
+      ],
+    },
+    {
+      id: 'performance',
+      label: 'Performance',
+      icon: <PerfIcon />,
+      children: [
+        { path: '/data/api/v1/systemPerformance/charts', label: 'Charts' },
+        { path: '/data/api/v1/systemPerformance/currentGauges', label: 'Current Gauges' },
+        { path: '/data/api/v1/systemPerformance/threads', label: 'Threads' },
       ],
     },
   ];
@@ -385,18 +446,12 @@ export function APIExplorer() {
                       <Divider sx={{ my: 1 }} />
                       {gatewayInfo?.system ? (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="body2" color="text.secondary">Version</Typography>
-                            <Typography variant="body2">{gatewayInfo.system.version || 'N/A'}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="body2" color="text.secondary">Edition</Typography>
-                            <Typography variant="body2">{gatewayInfo.system.edition || 'N/A'}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="body2" color="text.secondary">Uptime</Typography>
-                            <Typography variant="body2">{gatewayInfo.system.uptime || 'N/A'}</Typography>
-                          </Box>
+                          {Object.entries(gatewayInfo.system as Record<string, unknown>).slice(0, 8).map(([key, value]) => (
+                            <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <Typography variant="body2" color="text.secondary">{key}</Typography>
+                              <Typography variant="body2">{String(value ?? 'N/A')}</Typography>
+                            </Box>
+                          ))}
                         </Box>
                       ) : (
                         <Typography color="text.secondary">Unable to fetch system info</Typography>
@@ -404,7 +459,7 @@ export function APIExplorer() {
                     </CardContent>
                   </Card>
 
-                  {/* License Card */}
+                  {/* License / Trial Card */}
                   <Card variant="outlined">
                     <CardContent>
                       <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -413,14 +468,28 @@ export function APIExplorer() {
                       <Divider sx={{ my: 1 }} />
                       {gatewayInfo?.license ? (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                          <Chip
-                            label={gatewayInfo.license.isValid ? 'Valid' : 'Invalid'}
-                            color={gatewayInfo.license.isValid ? 'success' : 'error'}
-                            size="small"
-                          />
-                          <Typography variant="body2">
-                            Expires: {gatewayInfo.license.expirationDate || 'N/A'}
-                          </Typography>
+                          {typeof gatewayInfo.license === 'object' && !Array.isArray(gatewayInfo.license) ? (
+                            Object.entries(gatewayInfo.license as Record<string, unknown>).slice(0, 6).map(([key, value]) => (
+                              <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="body2" color="text.secondary">{key}</Typography>
+                                <Typography variant="body2">{String(value ?? 'N/A')}</Typography>
+                              </Box>
+                            ))
+                          ) : (
+                            <Typography variant="body2">
+                              {JSON.stringify(gatewayInfo.license, null, 2)}
+                            </Typography>
+                          )}
+                        </Box>
+                      ) : gatewayInfo?.trial ? (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <Chip label="Trial Mode" color="warning" size="small" />
+                          {Object.entries(gatewayInfo.trial as Record<string, unknown>).map(([key, value]) => (
+                            <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <Typography variant="body2" color="text.secondary">{key}</Typography>
+                              <Typography variant="body2">{String(value ?? 'N/A')}</Typography>
+                            </Box>
+                          ))}
                         </Box>
                       ) : (
                         <Typography color="text.secondary">Unable to fetch license info</Typography>
@@ -437,18 +506,26 @@ export function APIExplorer() {
                       <Divider sx={{ my: 1 }} />
                       {gatewayInfo?.modules ? (
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {Array.isArray(gatewayInfo.modules) ? (
-                            gatewayInfo.modules.slice(0, 10).map((mod: { name: string; state: string }, i: number) => (
+                          {typeof gatewayInfo.modules === 'boolean' ? (
+                            <Chip
+                              label={gatewayInfo.modules ? 'All Healthy' : 'Issues Detected'}
+                              color={gatewayInfo.modules ? 'success' : 'error'}
+                              size="small"
+                            />
+                          ) : Array.isArray(gatewayInfo.modules) ? (
+                            gatewayInfo.modules.slice(0, 15).map((mod: { name?: string; state?: string } | string, i: number) => (
                               <Chip
                                 key={i}
-                                label={mod.name}
+                                label={typeof mod === 'string' ? mod : (mod.name || 'Unknown')}
                                 size="small"
-                                color={mod.state === 'RUNNING' ? 'success' : 'default'}
+                                color={typeof mod === 'object' && mod.state === 'RUNNING' ? 'success' : 'default'}
                                 variant="outlined"
                               />
                             ))
                           ) : (
-                            <Typography color="text.secondary">No modules found</Typography>
+                            <Typography variant="body2">
+                              {JSON.stringify(gatewayInfo.modules)}
+                            </Typography>
                           )}
                         </Box>
                       ) : (
@@ -527,7 +604,7 @@ export function APIExplorer() {
                   fullWidth
                   value={requestPath}
                   onChange={(e) => setRequestPath(e.target.value)}
-                  placeholder="/data/status/sys-info"
+                  placeholder="/data/api/v1/gateway-info"
                 />
                 <Button
                   variant="contained"

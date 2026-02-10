@@ -280,11 +280,10 @@ async def fetch_openapi_spec(request: GatewayRequest):
     """
     api_key = _get_api_key(request.api_key_name, request.api_key)
 
-    # Try common OpenAPI spec paths
+    # Try common OpenAPI spec paths (Ignition 8.3 serves at /openapi.json)
     paths_to_try = [
-        "/data/openapi.json",
-        "/system/openapi.json",
         "/openapi.json",
+        "/openapi",
     ]
 
     for path in paths_to_try:
@@ -310,44 +309,67 @@ async def get_gateway_info(request: GatewayRequest):
     """
     Get gateway system information
 
-    Returns version, license, modules, and system status
+    Uses Ignition 8.3 REST API endpoints to gather system info.
+    Falls back to legacy /system/gwinfo for basic info.
     """
     api_key = _get_api_key(request.api_key_name, request.api_key)
 
-    # Gather info from multiple endpoints in parallel
-    info = {}
+    info: dict[str, Any] = {}
 
-    # Get system info
+    # Get gateway info (Ignition 8.3 API)
     try:
-        sys_info = await _make_gateway_request(
+        gw_info = await _make_gateway_request(
             gateway_url=request.gateway_url,
-            path="/data/status/sys-info",
+            path="/data/api/v1/gateway-info",
             api_key=api_key,
         )
-        if sys_info["status_code"] == 200:
-            info["system"] = sys_info["body"]
+        if gw_info["status_code"] == 200:
+            body = gw_info["body"]
+            info["system"] = body
     except Exception as e:
-        logger.warning(f"Could not get sys-info: {e}")
-        info["system"] = None
+        logger.warning(f"Could not get gateway-info: {e}")
 
-    # Get platform info
+    # Fallback to legacy /system/gwinfo (no auth required)
+    if not info.get("system"):
+        try:
+            legacy = await _make_gateway_request(
+                gateway_url=request.gateway_url,
+                path="/system/gwinfo",
+            )
+            if legacy["status_code"] == 200:
+                text = legacy["body"] if isinstance(legacy["body"], str) else ""
+                parsed = {}
+                for pair in text.split(";"):
+                    if "=" in pair:
+                        k, v = pair.split("=", 1)
+                        parsed[k] = v
+                info["system"] = {
+                    "version": parsed.get("Version", "Unknown"),
+                    "edition": parsed.get("PlatformEdition", ""),
+                    "state": parsed.get("ContextStatus", ""),
+                    "platformName": parsed.get("PlatformName", ""),
+                }
+        except Exception as e:
+            logger.warning(f"Could not get legacy gwinfo: {e}")
+            info["system"] = None
+
+    # Get overview (connections, problems)
     try:
-        platform_info = await _make_gateway_request(
+        overview = await _make_gateway_request(
             gateway_url=request.gateway_url,
-            path="/data/status/platform",
+            path="/data/api/v1/overview",
             api_key=api_key,
         )
-        if platform_info["status_code"] == 200:
-            info["platform"] = platform_info["body"]
+        if overview["status_code"] == 200:
+            info["overview"] = overview["body"]
     except Exception as e:
-        logger.warning(f"Could not get platform info: {e}")
-        info["platform"] = None
+        logger.warning(f"Could not get overview: {e}")
 
-    # Get modules
+    # Get module health
     try:
         modules_info = await _make_gateway_request(
             gateway_url=request.gateway_url,
-            path="/data/status/modules",
+            path="/data/api/v1/modules/healthy",
             api_key=api_key,
         )
         if modules_info["status_code"] == 200:
@@ -360,7 +382,7 @@ async def get_gateway_info(request: GatewayRequest):
     try:
         license_info = await _make_gateway_request(
             gateway_url=request.gateway_url,
-            path="/data/status/license",
+            path="/data/api/v1/licenses",
             api_key=api_key,
         )
         if license_info["status_code"] == 200:
@@ -368,6 +390,18 @@ async def get_gateway_info(request: GatewayRequest):
     except Exception as e:
         logger.warning(f"Could not get license: {e}")
         info["license"] = None
+
+    # Get trial info
+    try:
+        trial_info = await _make_gateway_request(
+            gateway_url=request.gateway_url,
+            path="/data/api/v1/trial",
+            api_key=api_key,
+        )
+        if trial_info["status_code"] == 200:
+            info["trial"] = trial_info["body"]
+    except Exception as e:
+        logger.warning(f"Could not get trial info: {e}")
 
     return info
 
@@ -386,17 +420,18 @@ async def list_resources(resource_type: str, request: GatewayRequest):
     """
     api_key = _get_api_key(request.api_key_name, request.api_key)
 
-    # Map resource types to API paths
+    # Map resource types to Ignition 8.3 API paths
     resource_paths = {
-        "databases": "/data/config/database-connections",
-        "opc": "/data/config/opc-connections",
-        "tags": "/data/config/tag-providers",
-        "projects": "/data/config/projects",
-        "devices": "/data/config/devices",
-        "users": "/data/config/users",
-        "roles": "/data/config/roles",
-        "schedules": "/data/config/schedules",
-        "scripts": "/data/config/scripts",
+        "databases": "/data/api/v1/resources/list/ignition/database-connection",
+        "opc": "/data/api/v1/resources/list/ignition/opc-connection",
+        "tags": "/data/api/v1/resources/list/ignition/tag-provider",
+        "projects": "/data/api/v1/projects/list",
+        "devices": "/data/api/v1/resources/list/com.inductiveautomation.opcua/device",
+        "users": "/data/api/v1/resources/list/ignition/user-source",
+        "schedules": "/data/api/v1/resources/list/ignition/schedule",
+        "alarm-journals": "/data/api/v1/resources/list/ignition/alarm-journal",
+        "email-profiles": "/data/api/v1/resources/list/ignition/email-profile",
+        "audit-profiles": "/data/api/v1/resources/list/ignition/audit-profile",
     }
 
     if resource_type not in resource_paths:
@@ -459,7 +494,7 @@ async def scan_projects(request: ScanRequest):
 
     response = await _make_gateway_request(
         gateway_url=request.gateway_url,
-        path="/data/designer/project-scan",
+        path="/data/api/v1/scan/projects",
         method="POST",
         api_key=api_key,
     )
@@ -484,7 +519,7 @@ async def scan_config(request: ScanRequest):
 
     response = await _make_gateway_request(
         gateway_url=request.gateway_url,
-        path="/data/config/scan",
+        path="/data/api/v1/scan/config",
         method="POST",
         api_key=api_key,
     )
@@ -515,25 +550,30 @@ async def test_gateway_connection(request: GatewayRequest):
     try:
         response = await _make_gateway_request(
             gateway_url=request.gateway_url,
-            path="/data/status/sys-info",
+            path="/data/api/v1/gateway-info",
             api_key=api_key,
         )
 
         if response["status_code"] == 200:
+            body = response["body"]
+            version = body.get("version", "Unknown") if isinstance(body, dict) else "Unknown"
             return {
                 "success": True,
                 "message": "Connection successful",
-                "gateway_version": response["body"].get("version", "Unknown"),
+                "gateway_version": version,
             }
         elif response["status_code"] == 401:
             return {
                 "success": False,
-                "message": "Authentication failed - invalid or missing API key",
+                "message": "Authentication failed - invalid or missing API key. "
+                "Ensure 'Require secure connections for API Keys' is disabled "
+                "if connecting over HTTP.",
             }
         elif response["status_code"] == 403:
             return {
                 "success": False,
-                "message": "Access denied - API key lacks required permissions",
+                "message": "Access denied - API key may require HTTPS. "
+                "Check 'Require secure connections for API Keys' in Gateway settings.",
             }
         else:
             return {
