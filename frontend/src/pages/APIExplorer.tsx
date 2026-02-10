@@ -39,7 +39,6 @@ import {
   Refresh as RefreshIcon,
   ExpandMore as ExpandIcon,
   ChevronRight as ChevronIcon,
-  Storage as DatabaseIcon,
   Info as InfoIcon,
   PlayArrow as ScanIcon,
   Extension as ModulesIcon,
