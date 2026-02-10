@@ -9,6 +9,8 @@ import os
 import subprocess
 import time
 
+from pathlib import Path
+
 from ignition_toolkit.clouddesigner.docker import (
     CREATION_FLAGS,
     find_docker_executable,
@@ -21,6 +23,7 @@ from ignition_toolkit.clouddesigner.models import (
     CloudDesignerStatus,
     DockerStatus,
 )
+from ignition_toolkit.core.paths import get_data_dir
 from ignition_toolkit.credentials.vault import get_credential_vault
 
 logger = logging.getLogger(__name__)
@@ -48,13 +51,17 @@ class CloudDesignerManager:
 
     def __init__(self):
         self.compose_dir = get_docker_files_path()
+        # Write .env to writable data dir, not the (possibly read-only) install dir
+        self._env_file = get_data_dir() / "clouddesigner" / ".env"
 
     def _get_compose_args(self) -> tuple[list[str], "Path"]:
         """
         Get docker compose arguments and working directory.
 
         Uses cwd-based approach for both WSL and native Docker.
-        Docker Compose finds docker-compose.yml and .env in the working directory.
+        Docker Compose finds docker-compose.yml in the working directory.
+        The .env file is passed explicitly via --env-file since it lives
+        in the writable data directory (not the install directory).
 
         For WSL, this avoids path-quoting issues when paths contain spaces
         (e.g., /mnt/c/Program Files/...). The cwd is set at the OS process level
@@ -63,7 +70,10 @@ class CloudDesignerManager:
         Returns:
             Tuple of (compose_args, run_cwd)
         """
-        return ["compose"], self.compose_dir
+        args = ["compose"]
+        if self._env_file.exists():
+            args += ["--env-file", str(self._env_file)]
+        return args, self.compose_dir
 
     def _write_compose_env(self, env_vars: dict[str, str]) -> None:
         """
@@ -78,7 +88,8 @@ class CloudDesignerManager:
         Args:
             env_vars: Dictionary of environment variable names to values
         """
-        env_file = self.compose_dir / ".env"
+        # Write to the writable data directory, not the install directory
+        self._env_file.parent.mkdir(parents=True, exist_ok=True)
         lines = []
         for key, value in env_vars.items():
             if value is None:
@@ -91,9 +102,9 @@ class CloudDesignerManager:
             else:
                 lines.append(f'{key}={value}')
 
-        env_file.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        self._env_file.write_text('\n'.join(lines) + '\n', encoding='utf-8')
         # Log var names but not values (may contain passwords)
-        logger.info(f"[CloudDesigner] Wrote .env file with variables: {list(env_vars.keys())}")
+        logger.info(f"[CloudDesigner] Wrote .env file to {self._env_file} with variables: {list(env_vars.keys())}")
 
     def _image_exists(self, image_name: str) -> bool:
         """Check if a Docker image exists locally."""
