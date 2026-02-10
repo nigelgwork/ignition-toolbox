@@ -113,7 +113,7 @@ class CloudDesignerManager:
         "nginx:alpine": "pull",
         "guacamole/guacd:1.5.4": "pull",
         "guacamole/guacamole:1.5.4": "pull",
-        "docker_files-designer-desktop": "build",
+        "clouddesigner-desktop": "build",
     }
 
     def get_image_status(self) -> dict:
@@ -202,7 +202,7 @@ class CloudDesignerManager:
         Returns:
             dict with success status and output/error
         """
-        if not force and self._image_exists("docker_files-designer-desktop"):
+        if not force and self._image_exists("clouddesigner-desktop"):
             logger.info("[CloudDesigner] designer-desktop image already exists, skipping build")
             return {
                 "success": True,
@@ -619,7 +619,7 @@ class CloudDesignerManager:
             compose_args, run_cwd = self._get_compose_args()
 
             # Check current state to determine what we need to do
-            image_exists = self._image_exists("docker_files-designer-desktop")
+            image_exists = self._image_exists("clouddesigner-desktop")
             containers_running = self._all_containers_running()
 
             logger.info(f"[CloudDesigner] Image exists: {image_exists}")
@@ -941,7 +941,7 @@ class CloudDesignerManager:
             # Step 5: Remove cached images
             logger.info("[CloudDesigner Cleanup] Step 5/5: Removing cached images...")
             images_to_remove = [
-                "docker_files-designer-desktop",
+                "clouddesigner-desktop",
                 "guacamole/guacamole:1.5.4",
                 "guacamole/guacd:1.5.4",
                 "nginx:alpine",

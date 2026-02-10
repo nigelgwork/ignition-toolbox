@@ -62,6 +62,7 @@ services:
       start_period: 60s  # Give Tomcat/Guacamole time to initialize
 
   designer-desktop:
+    image: clouddesigner-desktop:latest
     build:
       context: ./designer-desktop
       args:
