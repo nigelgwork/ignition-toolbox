@@ -75,15 +75,21 @@ def is_browser_installed() -> bool:
         chromium_dirs = list(browsers_path.glob(pattern))
         for chromium_dir in chromium_dirs:
             # Check for executables based on platform and browser variant
+            # Playwright versions use different directory names (e.g., chrome-win vs chrome-win64)
             if sys.platform == "win32":
                 exe_paths = [
                     chromium_dir / "chrome-win" / "chrome.exe",
+                    chromium_dir / "chrome-win64" / "chrome.exe",
                     chromium_dir / "chrome-win" / "headless_shell.exe",
+                    chromium_dir / "chrome-win64" / "headless_shell.exe",
+                    chromium_dir / "chrome-headless-shell-win64" / "headless_shell.exe",
                 ]
             elif sys.platform == "darwin":
                 exe_paths = [
                     chromium_dir / "chrome-mac" / "Chromium.app" / "Contents" / "MacOS" / "Chromium",
+                    chromium_dir / "chrome-mac-arm64" / "Chromium.app" / "Contents" / "MacOS" / "Chromium",
                     chromium_dir / "chrome-mac" / "headless_shell",
+                    chromium_dir / "chrome-mac-arm64" / "headless_shell",
                 ]
             else:
                 exe_paths = [
