@@ -21,7 +21,8 @@ import {
   ExpandMore as ExpandIcon,
 } from '@mui/icons-material';
 import { JsonViewer } from './JsonViewer';
-import { TableView, extractTableData } from './TableView';
+import { TableView } from './TableView';
+import { extractTableData } from './utils';
 
 interface ResponseViewerProps {
   response: {
