@@ -18,6 +18,7 @@ from ignition_toolkit.clouddesigner.docker import (
     get_docker_files_path,
     is_using_wsl_docker,
     translate_localhost_url,
+    windows_to_wsl_path,
 )
 from ignition_toolkit.clouddesigner.models import (
     CloudDesignerStatus,
@@ -72,7 +73,10 @@ class CloudDesignerManager:
         """
         args = ["compose"]
         if self._env_file.exists():
-            args += ["--env-file", str(self._env_file)]
+            env_path = str(self._env_file)
+            if is_using_wsl_docker():
+                env_path = windows_to_wsl_path(env_path)
+            args += ["--env-file", env_path]
         return args, self.compose_dir
 
     def _write_compose_env(self, env_vars: dict[str, str]) -> None:
