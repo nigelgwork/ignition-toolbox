@@ -1,5 +1,5 @@
 name: "Module Install"
-version: "4.1-ui"
+version: "4.1"
 description: "Install a new module - Upload, Install, and Restart"
 domain: gateway
 group: "Gateway (Base Playbooks)"
