@@ -278,19 +278,6 @@ describe('PlaybookCard', () => {
     expect(screen.getByText('Duplicate Playbook')).toBeInTheDocument();
   });
 
-  it('displays truncated path', () => {
-    const playbook = createTestPlaybook({ path: 'gateway/category/test-playbook.yaml' });
-    renderWithQueryClient(
-      <PlaybookCard
-        playbook={playbook}
-        onConfigure={mockOnConfigure}
-      />
-    );
-
-    // Should show last two parts of path
-    expect(screen.getByText('category/test-playbook.yaml')).toBeInTheDocument();
-  });
-
   it('has schedule mode toggle', () => {
     const playbook = createTestPlaybook();
     renderWithQueryClient(

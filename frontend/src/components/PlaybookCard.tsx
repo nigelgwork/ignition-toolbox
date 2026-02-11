@@ -389,11 +389,6 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
         >
           {playbook.description}
         </Typography>
-
-        {/* Domain/Category path */}
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-          {playbook.path.split('/').slice(-2).join('/')}
-        </Typography>
       </CardContent>
 
       {/* Action Buttons */}
