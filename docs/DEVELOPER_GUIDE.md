@@ -143,9 +143,9 @@ See [VERSIONING_GUIDE.md](VERSIONING_GUIDE.md) for the full release workflow. In
 
 1. Update version in `package.json` and `frontend/package.json`
 2. Commit changes
-3. Tag and push: `git tag v1.5.5 && git push origin v1.5.5`
+3. Tag and push: `git tag v2.0.0 && git push origin v2.0.0`
 4. GitHub Actions builds and publishes the Windows installer automatically
 
 ---
 
-**Last Updated**: 2026-02-06
+**Last Updated**: 2026-02-11

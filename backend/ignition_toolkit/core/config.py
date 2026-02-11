@@ -212,10 +212,10 @@ class Settings(BaseSettings):
     vault_path: Path = get_credentials_file()
 
     # API
-    api_host: str = "0.0.0.0"
+    api_host: str = "127.0.0.1"
     api_port: int = 5000
     api_workers: int = 1
-    cors_origins: list[str] = ["*"]
+    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5000", "app://.", "file://"]
     websocket_api_key: str = ""  # Will be auto-generated if not set
 
     def __init__(self, **kwargs):

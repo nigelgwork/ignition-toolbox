@@ -6,8 +6,8 @@ Ignition Toolbox uses a **single version number** tracked in two places:
 
 | File | Example |
 |------|---------|
-| `package.json` | `"version": "1.5.5"` |
-| `frontend/package.json` | `"version": "1.5.5"` |
+| `package.json` | `"version": "2.0.0"` |
+| `frontend/package.json` | `"version": "2.0.0"` |
 
 These two files must always match. This version is what users see in the app, in GitHub Releases, and in auto-update notifications.
 
@@ -35,8 +35,8 @@ MAJOR.MINOR.PATCH    (e.g. 1.5.0)
 2. **Commit** the version bump
 3. **Tag and push:**
    ```bash
-   git tag v1.5.1
-   git push origin v1.5.1
+   git tag v2.0.0
+   git push origin v2.0.0
    ```
 4. **GitHub Actions** (`build-windows.yml`) automatically:
    - Builds on a `windows-latest` runner
@@ -51,11 +51,11 @@ You can also trigger builds manually from the GitHub Actions UI (workflow_dispat
 - [ ] Update `package.json` version
 - [ ] Update `frontend/package.json` version
 - [ ] Commit changes
-- [ ] Create git tag (`git tag v1.X.Y`)
-- [ ] Push tag (`git push origin v1.X.Y`)
+- [ ] Create git tag (`git tag vX.Y.Z`)
+- [ ] Push tag (`git push origin vX.Y.Z`)
 - [ ] Verify GitHub Actions build succeeds
 
 ---
 
-**Current Version**: 1.5.5
-**Last Updated**: 2026-02-06
+**Current Version**: 2.0.0
+**Last Updated**: 2026-02-11

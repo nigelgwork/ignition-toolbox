@@ -105,6 +105,14 @@ COPY config/xfce4/ /home/designer/.config/xfce4/
 # XFCE respects ~/.config/autostart/ for session autostart apps
 COPY config/xfce4/autostart/designer.desktop /home/designer/.config/autostart/
 
+# Store autostart file in a SAFE location outside /home/designer
+# The designer-home volume mount overlays /home/designer, so files placed there
+# at build time are lost on subsequent container starts (volume retains old data).
+# start-desktop.sh copies from this safe location on every startup.
+RUN mkdir -p /etc/clouddesigner \
+    && cp /home/designer/.config/autostart/designer.desktop /etc/clouddesigner/designer.desktop \
+    && chmod 644 /etc/clouddesigner/designer.desktop
+
 # ============================================
 # Designer Download and Launch Scripts
 # ============================================

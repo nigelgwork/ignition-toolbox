@@ -51,11 +51,6 @@ jobs:
       - name: Build Frontend
         run: npm run build:frontend
 
-      - name: Type check frontend
-        run: |
-          cd frontend
-          npm run build
-
       - name: Run backend tests
         run: |
           cd backend

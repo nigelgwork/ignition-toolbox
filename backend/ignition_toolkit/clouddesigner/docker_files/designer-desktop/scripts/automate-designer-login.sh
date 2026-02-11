@@ -6,14 +6,18 @@
 # Automation steps:
 # 1. Wait for Designer Launcher window to appear
 # 2. Click "Add Designer" button to open the dialog
-# 3. Click on "On Your Network" tab, then use Right arrow to switch to "Manual" tab
+# 3. Navigate to "Manual" tab using arrow keys
 # 4. Tab to the Gateway URL input field and type the URL
 # 5. Press Enter to submit and add the gateway
-# 6. Optionally handle login dialog if credentials are provided
+# 6. Click "Open Designer" to launch the designer
+# 7. Wait for login dialog (Designer downloads on first launch, 30-120s)
+# 8. Enter credentials and submit login
 #
 # Screenshots are saved to /tmp/automation-screenshots/ for debugging.
-
-set -e
+#
+# NOTE: Do NOT use set -e here. xdotool commands fail frequently in GUI
+# automation (windows not found, focus issues, etc.) and individual failures
+# should not abort the entire automation flow.
 
 LOG_FILE="/tmp/automate-designer.log"
 CREDENTIALS_FILE="/tmp/designer-credentials.env"
@@ -168,66 +172,161 @@ sleep 3
 
 screenshot "05_after_submit"
 
-# Wait for connection
-log "Waiting for gateway connection..."
-sleep 5
+# ============================================
+# Step 6: Click "Open Designer" to launch
+# ============================================
+# After adding the gateway, we return to the main launcher view.
+# The "Open Designer" button appears at the bottom-right.
+log "Step 6: Preparing to click 'Open Designer'"
 
-screenshot "06_after_wait"
+# Wait for the dialog to fully close and main view to settle
+sleep 5
+screenshot "06_main_view_with_gateway"
+
+# Re-focus the launcher window and get updated geometry
+xdotool windowactivate --sync "$LAUNCHER_WINDOW"
+sleep 1
+eval $(xdotool getwindowgeometry --shell "$LAUNCHER_WINDOW")
+log "Launcher geometry: X=$X, Y=$Y, WIDTH=$WIDTH, HEIGHT=$HEIGHT"
+
+# Move the launcher window to a known position (0,0) so we can calculate
+# absolute button coordinates precisely. XFCE window manager decorations
+# cause xdotool geometry to differ from actual screen position.
+log "Moving launcher to position (0,0) for reliable click targeting"
+xdotool windowmove --sync "$LAUNCHER_WINDOW" 0 0
+sleep 1
+
+# Re-measure geometry after move
+eval $(xdotool getwindowgeometry --shell "$LAUNCHER_WINDOW")
+log "New geometry after move: X=$X, Y=$Y, WIDTH=$WIDTH, HEIGHT=$HEIGHT"
+screenshot "06b_window_moved"
+
+# The "Open Designer" button is in the bottom-right of the client area.
+# After moving to (0,0), the window frame starts at the screen origin.
+# In the main launcher view with a gateway card, the bottom button row
+# contains: [Edit] ............. [Add Designer] [Open Designer]
+# "Open Designer" is the rightmost button. We click at:
+#   X: about 90% of the way across (right-aligned button group)
+#   Y: about 93% of the way down (bottom button row, above window border)
+OPEN_BTN_X=$((WIDTH * 90 / 100))
+OPEN_BTN_Y=$((HEIGHT * 93 / 100))
+log "Clicking 'Open Designer' at ($OPEN_BTN_X, $OPEN_BTN_Y)"
+click_at $OPEN_BTN_X $OPEN_BTN_Y "Open Designer button"
+sleep 3
+
+screenshot "06c_after_open_click"
+
+# Verify: if a progress/download dialog appeared or the view changed, good.
+# If not, try a second click slightly offset (button edges vary by theme)
+OPEN_BTN_X2=$((WIDTH * 88 / 100))
+OPEN_BTN_Y2=$((HEIGHT * 91 / 100))
+log "Second attempt at ($OPEN_BTN_X2, $OPEN_BTN_Y2)"
+click_at $OPEN_BTN_X2 $OPEN_BTN_Y2 "Open Designer button (retry)"
+sleep 3
+
+screenshot "07_after_open_designer_click"
 
 # Check if we need to handle login
 if [ -z "$IGNITION_USERNAME" ] || [ -z "$IGNITION_PASSWORD" ]; then
-    log "No credentials provided - stopping automation"
-    screenshot "07_no_credentials"
+    log "No credentials provided - stopping automation after opening Designer"
+    screenshot "08_no_credentials"
     exit 0
 fi
 
-log "Checking for login prompt..."
-sleep 2
+# ============================================
+# Step 7: Wait for login dialog
+# ============================================
+# The Designer downloads from the gateway on first launch, which can take
+# 30-120 seconds depending on network speed. Poll for the login dialog.
+log "Step 7: Waiting for login dialog (Designer may be downloading)..."
 
-# Look for login dialog
 LOGIN_WINDOW=""
-for pattern in "Login" "Sign In" "Authentication" "Credentials"; do
-    LOGIN_WINDOW=$(xdotool search --name "$pattern" 2>/dev/null | head -1) || true
-    if [ -n "$LOGIN_WINDOW" ]; then
-        log "Found $pattern window: $LOGIN_WINDOW"
-        break
+LOGIN_MAX_WAIT=120
+LOGIN_WAITED=0
+
+while [ -z "$LOGIN_WINDOW" ] && [ $LOGIN_WAITED -lt $LOGIN_MAX_WAIT ]; do
+    sleep 3
+    LOGIN_WAITED=$((LOGIN_WAITED + 3))
+
+    for pattern in "Login" "Sign In" "Authentication" "Credentials"; do
+        LOGIN_WINDOW=$(xdotool search --name "$pattern" 2>/dev/null | head -1) || true
+        if [ -n "$LOGIN_WINDOW" ]; then
+            log "Found login dialog ($pattern): $LOGIN_WINDOW after ${LOGIN_WAITED}s"
+            break 2
+        fi
+    done
+
+    # Check if Designer opened directly (no login needed — e.g. trial mode)
+    # Exclude the launcher window (its title "Ignition Designer Launcher" also matches)
+    DESIGNER_WINDOW=$(xdotool search --name "Ignition Designer" 2>/dev/null | grep -v "^${LAUNCHER_WINDOW}$" | head -1) || true
+    if [ -n "$DESIGNER_WINDOW" ]; then
+        log "Designer opened without login after ${LOGIN_WAITED}s"
+        screenshot "08_designer_no_login"
+        log "Automation complete - Designer is open"
+        exit 0
+    fi
+
+    if [ $((LOGIN_WAITED % 15)) -eq 0 ]; then
+        log "Still waiting for login dialog... ($LOGIN_WAITED/${LOGIN_MAX_WAIT}s)"
+        screenshot "07_waiting_${LOGIN_WAITED}s"
     fi
 done
 
-screenshot "07_login_check"
-
-if [ -n "$LOGIN_WINDOW" ]; then
-    xdotool windowactivate --sync "$LOGIN_WINDOW"
-    sleep 1
-
-    log "Entering credentials"
-    xdotool type --clearmodifiers --delay 30 "$IGNITION_USERNAME"
-    log "Entered username: $IGNITION_USERNAME"
-    sleep 0.5
-
-    screenshot "08_username_entered"
-
-    xdotool key Tab
-    sleep 0.3
-    xdotool type --clearmodifiers --delay 30 "$IGNITION_PASSWORD"
-    log "Entered password"
-    sleep 0.5
-
-    screenshot "09_password_entered"
-
-    xdotool key Return
-    log "Submitted login"
-    sleep 5
-
-    screenshot "10_login_submitted"
-else
-    log "No login dialog found"
-    screenshot "07b_no_login"
+if [ -z "$LOGIN_WINDOW" ]; then
+    log "WARNING: Login dialog not found after ${LOGIN_MAX_WAIT}s"
+    screenshot "08_no_login_dialog"
+    log "Automation stopping - manual login may be required"
+    exit 0
 fi
 
-log "Checking final state..."
-sleep 3
-screenshot "11_final_state"
+# ============================================
+# Step 8: Enter credentials and login
+# ============================================
+log "Step 8: Entering credentials"
+screenshot "08_login_dialog_found"
+
+xdotool windowactivate --sync "$LOGIN_WINDOW"
+sleep 1
+
+# Type username
+xdotool type --clearmodifiers --delay 30 "$IGNITION_USERNAME"
+log "Entered username: $IGNITION_USERNAME"
+sleep 0.5
+screenshot "09_username_entered"
+
+# Tab to password field and type password
+xdotool key Tab
+sleep 0.3
+xdotool type --clearmodifiers --delay 30 "$IGNITION_PASSWORD"
+log "Entered password"
+sleep 0.5
+screenshot "10_password_entered"
+
+# Submit login
+xdotool key Return
+log "Submitted login"
+sleep 5
+screenshot "11_login_submitted"
+
+# Wait for Designer to fully open
+log "Waiting for Designer to open..."
+DESIGNER_WINDOW=""
+DESIGNER_MAX_WAIT=60
+DESIGNER_WAITED=0
+
+while [ -z "$DESIGNER_WINDOW" ] && [ $DESIGNER_WAITED -lt $DESIGNER_MAX_WAIT ]; do
+    sleep 3
+    DESIGNER_WAITED=$((DESIGNER_WAITED + 3))
+    DESIGNER_WINDOW=$(xdotool search --name "Ignition Designer" 2>/dev/null | grep -v "^${LAUNCHER_WINDOW}$" | head -1) || true
+done
+
+if [ -n "$DESIGNER_WINDOW" ]; then
+    log "Designer opened successfully after login"
+else
+    log "Designer window not detected (may still be loading)"
+fi
+
+screenshot "12_final_state"
 
 log "=========================================="
 log "Automation complete"

@@ -9,6 +9,7 @@
  */
 
 import { useState } from 'react';
+import { formatBytes } from '../utils/format';
 import {
   Dialog,
   DialogTitle,
@@ -162,11 +163,6 @@ export function PlaybookLibraryDialog({ open, onClose }: PlaybookLibraryDialogPr
   const perspectivePlaybooks = filteredPlaybooks.filter((pb) => pb.domain === 'perspective');
   const designerPlaybooks = filteredPlaybooks.filter((pb) => pb.domain === 'designer');
 
-  const formatBytes = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>

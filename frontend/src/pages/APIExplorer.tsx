@@ -437,7 +437,7 @@ export function APIExplorer() {
         api_key_name: selectedKey,
         method: requestMethod,
         path: requestPath,
-        body: requestBody ? JSON.parse(requestBody) : undefined,
+        body: requestBody ? (() => { try { return JSON.parse(requestBody); } catch (e) { throw new Error(`Invalid JSON in request body: ${(e as Error).message}`); } })() : undefined,
       }),
     onSuccess: (data) => {
       setRequestResponse(data);

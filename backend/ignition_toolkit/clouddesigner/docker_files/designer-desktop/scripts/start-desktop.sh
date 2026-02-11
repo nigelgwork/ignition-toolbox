@@ -42,5 +42,26 @@ fi
 mkdir -p /home/designer/.ignition/clientlauncher-data
 chown -R designer:designer /home/designer/.ignition
 
+# ============================================
+# Restore XFCE autostart (critical for auto-launch)
+# ============================================
+# The designer-home volume persists /home/designer across container restarts.
+# On image rebuild, the volume retains old data and does NOT refresh from the
+# new image. XFCE first-run also overwrites ~/.config/xfce4/ and may delete
+# the autostart directory. We always restore from /etc/clouddesigner/ which
+# is outside the volume mount and always comes fresh from the image.
+AUTOSTART_DIR="/home/designer/.config/autostart"
+AUTOSTART_SOURCE="/etc/clouddesigner/designer.desktop"
+if [ -f "$AUTOSTART_SOURCE" ]; then
+    mkdir -p "$AUTOSTART_DIR"
+    cp "$AUTOSTART_SOURCE" "$AUTOSTART_DIR/designer.desktop"
+    chmod 644 "$AUTOSTART_DIR/designer.desktop"
+    chown -R designer:designer /home/designer/.config/autostart
+    echo "XFCE autostart restored: $AUTOSTART_DIR/designer.desktop"
+else
+    echo "WARNING: Autostart source not found at $AUTOSTART_SOURCE"
+    echo "Designer will not auto-launch. Use desktop shortcut instead."
+fi
+
 # Start supervisor (manages VNC + desktop)
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf

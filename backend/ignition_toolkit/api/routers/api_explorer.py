@@ -169,6 +169,7 @@ async def _make_gateway_request(
 
     try:
         start = time.monotonic()
+        logger.debug("TLS verification disabled for gateway request to %s", url)
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, verify=False) as client:
             response = await client.request(
                 method=method.upper(),

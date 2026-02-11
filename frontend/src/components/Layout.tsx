@@ -14,6 +14,7 @@ import {
   ListItemText,
   Tooltip,
   IconButton,
+  Chip,
 } from '@mui/material';
 import {
   Storage as GatewayIcon,
@@ -38,13 +39,13 @@ import { isElectron } from '../utils/platform';
 // Domain tabs for playbook filtering
 export type DomainTab = 'gateway' | 'designer' | 'perspective' | 'executions' | 'api' | 'stackbuilder' | 'settings';
 
-const domainTabs: { id: DomainTab; label: string; icon: React.ReactNode; iconOnly?: boolean }[] = [
+const domainTabs: { id: DomainTab; label: string; icon: React.ReactNode; iconOnly?: boolean; badge?: string }[] = [
   { id: 'gateway', label: 'Gateway', icon: <GatewayIcon fontSize="small" /> },
   { id: 'designer', label: 'Designer', icon: <DesignerIcon fontSize="small" /> },
-  { id: 'perspective', label: 'Perspective', icon: <PerspectiveIcon fontSize="small" /> },
+  { id: 'perspective', label: 'Perspective', icon: <PerspectiveIcon fontSize="small" />, badge: 'Beta' },
   { id: 'executions', label: 'Executions', icon: <ExecutionsIcon fontSize="small" /> },
   { id: 'api', label: 'API', icon: <ApiIcon fontSize="small" /> },
-  { id: 'stackbuilder', label: 'Stacks', icon: <StackIcon fontSize="small" /> },
+  { id: 'stackbuilder', label: 'Stacks', icon: <StackIcon fontSize="small" />, badge: 'Beta' },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon fontSize="small" />, iconOnly: true },
 ];
 
@@ -212,6 +213,21 @@ export function Layout({ activeTab, onTabChange, children }: LayoutProps) {
                   }}
                 >
                   {tab.label}
+                  {tab.badge && (
+                    <Chip
+                      label={tab.badge}
+                      size="small"
+                      sx={{
+                        ml: 0.5,
+                        height: 18,
+                        fontSize: '0.65rem',
+                        fontWeight: 600,
+                        bgcolor: 'rgba(255, 152, 0, 0.15)',
+                        color: '#ff9800',
+                        border: '1px solid rgba(255, 152, 0, 0.3)',
+                      }}
+                    />
+                  )}
                 </Button>
               )
             ))}

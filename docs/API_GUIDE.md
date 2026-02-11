@@ -307,7 +307,7 @@ GET /api/health
 ```json
 {
   "status": "healthy",
-  "version": "1.5.5",
+  "version": "2.0.0",
   "uptime_seconds": 3600
 }
 ```
@@ -461,5 +461,5 @@ setInterval(() => {
 
 ---
 
-**Last Updated**: 2026-02-06
-**API Version**: 1.5.5
+**Last Updated**: 2026-02-11
+**API Version**: 2.0.0

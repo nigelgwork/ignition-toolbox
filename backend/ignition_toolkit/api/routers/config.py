@@ -57,5 +57,5 @@ async def get_config():
             "port": int(os.getenv("API_PORT", "5000")),
             "host": os.getenv("API_HOST", "0.0.0.0"),
         },
-        "websocket_api_key": settings.websocket_api_key,
+        "websocket_api_key": settings.websocket_api_key,  # TODO: migrate to Electron IPC
     }

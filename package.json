@@ -1,6 +1,6 @@
 {
   "name": "ignition-toolbox",
-  "version": "1.5.21",
+  "version": "2.0.0",
   "description": "Ignition Automation Toolkit - Visual acceptance testing platform for Ignition SCADA",
   "main": "dist-electron/main.js",
   "author": "Nigel G",
@@ -36,57 +36,5 @@
     "electron-builder": "^25.1.8",
     "typescript": "^5.7.2",
     "wait-on": "^8.0.1"
-  },
-  "build": {
-    "appId": "com.ignition-toolbox.app",
-    "productName": "Ignition Toolbox",
-    "directories": {
-      "buildResources": "resources",
-      "output": "release"
-    },
-    "files": [
-      "dist-electron/**/*",
-      "frontend/dist/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "backend/dist/backend",
-        "to": "backend",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "playwright-browsers",
-        "to": "playwright-browsers",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "resources/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": true,
-      "allowElevation": true,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "nigelgwork",
-      "repo": "ignition-toolbox"
-    }
   }
 }

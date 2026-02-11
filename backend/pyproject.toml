@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ignition-toolkit"
-version = "5.1.2"  # Updated: 2025-12-16
+version = "2.0.0"  # Updated: 2026-02-11
 description = "Lightweight automation toolkit for Ignition SCADA Gateway operations with plugin-based playbook library"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -42,10 +42,10 @@ dependencies = [
     "websockets>=14.0",
     "click>=8.1.7",
     "rich>=13.9.0",
-    "apscheduler>=3.10.4",
+    "apscheduler>=3.10.4,<4.0",
     "psutil>=6.1.0",
     "pillow>=10.0.0",  # WebP screenshot compression
-    "mcp>=1.0.0",  # MCP server for Claude Code integration
+    "mcp>=1.0.0,<2.0",  # MCP server for Claude Code integration
 ]
 
 [project.optional-dependencies]

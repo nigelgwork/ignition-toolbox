@@ -76,7 +76,12 @@ interface SavedConfig {
 
 function getSavedConfigPreview(playbookPath: string): SavedConfig | null {
   const stored = localStorage.getItem(`playbook_config_${playbookPath}`);
-  return stored ? JSON.parse(stored) : null;
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return null;
+  }
 }
 
 export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onViewSteps, onEditPlaybook }: PlaybookCardProps) {
@@ -145,7 +150,7 @@ export function PlaybookCard({ playbook, onConfigure, onExecute, onExport, onVie
   useEffect(() => {
     const interval = setInterval(() => {
       setSavedConfig(getSavedConfigPreview(playbook.path));
-    }, 1000);
+    }, 5000);
     return () => clearInterval(interval);
   }, [playbook.path]);
 
