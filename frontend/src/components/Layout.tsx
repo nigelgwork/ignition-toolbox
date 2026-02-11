@@ -27,6 +27,7 @@ import {
   Handyman as ToolboxIcon,
   Api as ApiIcon,
   Layers as StackIcon,
+  AccountTree as UdtIcon,
   PlaylistPlay as ExecutionsIcon,
 } from '@mui/icons-material';
 import { useStore } from '../store';
@@ -37,7 +38,7 @@ import packageJson from '../../package.json';
 import { isElectron } from '../utils/platform';
 
 // Domain tabs for playbook filtering
-export type DomainTab = 'gateway' | 'designer' | 'perspective' | 'executions' | 'api' | 'stackbuilder' | 'settings';
+export type DomainTab = 'gateway' | 'designer' | 'perspective' | 'executions' | 'api' | 'stackbuilder' | 'udtbuilder' | 'settings';
 
 const domainTabs: { id: DomainTab; label: string; icon: React.ReactNode; iconOnly?: boolean; badge?: string }[] = [
   { id: 'gateway', label: 'Gateway', icon: <GatewayIcon fontSize="small" /> },
@@ -46,6 +47,7 @@ const domainTabs: { id: DomainTab; label: string; icon: React.ReactNode; iconOnl
   { id: 'executions', label: 'Executions', icon: <ExecutionsIcon fontSize="small" /> },
   { id: 'api', label: 'API', icon: <ApiIcon fontSize="small" /> },
   { id: 'stackbuilder', label: 'Stacks', icon: <StackIcon fontSize="small" />, badge: 'Beta' },
+  { id: 'udtbuilder', label: 'UDTs', icon: <UdtIcon fontSize="small" />, badge: 'Beta' },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon fontSize="small" />, iconOnly: true },
 ];
 

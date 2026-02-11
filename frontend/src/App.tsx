@@ -8,7 +8,7 @@
 import { useState, useMemo, Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { CssBaseline, ThemeProvider, createTheme, CircularProgress, Box } from '@mui/material';
+import { CssBaseline, ThemeProvider, createTheme, CircularProgress, Box, Typography } from '@mui/material';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout, type DomainTab } from './components/Layout';
 import { Playbooks } from './pages/Playbooks';
@@ -166,6 +166,12 @@ function AppContent() {
           <Suspense fallback={<PageLoader />}>
             <StackBuilder />
           </Suspense>
+        );
+      case 'udtbuilder':
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', opacity: 0.5 }}>
+            <Typography variant="h5" color="text.secondary">UDT Builder — Coming Soon</Typography>
+          </Box>
         );
       case 'settings':
         return <Settings />;

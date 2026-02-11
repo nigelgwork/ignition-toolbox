@@ -125,8 +125,8 @@ python run_backend.py
 # 1. Update version in package.json and frontend/package.json
 # 2. Commit changes
 # 3. Create and push a version tag:
-git tag v2.0.2
-git push origin v2.0.2
+git tag v2.0.3
+git push origin v2.0.3
 
 # This triggers GitHub Actions workflow (build-windows.yml) which:
 # - Builds on windows-latest runner
@@ -231,8 +231,8 @@ GitHub Actions workflows in `.github/workflows/`:
 1. Make code changes and test locally (Python backend, frontend)
 2. Update version in `package.json` and `frontend/package.json`
 3. Commit all changes to main branch
-4. Create version tag: `git tag v2.0.2`
-5. Push tag: `git push origin v2.0.2`
+4. Create version tag: `git tag v2.0.3`
+5. Push tag: `git push origin v2.0.3`
 6. GitHub Actions automatically:
    - Builds on Windows runner
    - Packages with PyInstaller + electron-builder
@@ -268,7 +268,7 @@ You can also trigger builds from GitHub Actions UI:
 
 **Last Updated**: 2026-02-11
 **Maintainer**: Nigel G
-**Status**: Production Ready (v2.0.2) - All Development Phases Complete
+**Status**: Production Ready (v2.0.3) - All Development Phases Complete
 
 ## Development Phases
 
