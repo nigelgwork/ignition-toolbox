@@ -1,5 +1,5 @@
 name: Module Upgrade (Claude)
-version: 4.0-ui
+version: "4.0"
 description: Upgrade an existing module - Uninstall old version then install new version
 domain: gateway
 verified: true
